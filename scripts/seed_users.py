@@ -3,90 +3,130 @@
 import asyncio
 import sys
 from pathlib import Path
-from sqlalchemy import select
-from seed_utils import get_async_session, print_step, print_error, print_success
 
-# Add user-service to path
+from seed_utils import get_async_session, print_error, print_step, print_success
+from sqlalchemy import select
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "services" / "user-service"))
 
 from app.models import User, UserProfile
 
-
-# Demo user data
 DEMO_USERS = [
     {
         "username": "alice_dev",
         "email": "alice@example.com",
-        "topic_preferences": {"ai": 0.9, "backend": 0.6, "system-design": 0.7},
+        "bio": "Platform-focused engineer learning how ranking systems personalize AI-heavy feeds.",
+        "topic_preferences": {
+            "ai": 0.92,
+            "backend": 0.68,
+            "system-design": 0.81,
+            "devops": 0.35,
+            "interview-prep": 0.24,
+        },
     },
     {
         "username": "bob_engineer",
         "email": "bob@example.com",
-        "topic_preferences": {"backend": 0.95, "system-design": 0.8, "devops": 0.5},
+        "bio": "Backend engineer who gravitates toward APIs, databases, and reliable production systems.",
+        "topic_preferences": {
+            "ai": 0.31,
+            "backend": 0.96,
+            "system-design": 0.85,
+            "devops": 0.62,
+            "interview-prep": 0.18,
+        },
     },
     {
         "username": "charlie_sysadmin",
         "email": "charlie@example.com",
-        "topic_preferences": {"devops": 0.9, "system-design": 0.7, "backend": 0.6},
+        "bio": "Infra-minded operator interested in observability, containers, and resilient architecture.",
+        "topic_preferences": {
+            "ai": 0.22,
+            "backend": 0.59,
+            "system-design": 0.76,
+            "devops": 0.94,
+            "interview-prep": 0.28,
+        },
     },
     {
         "username": "dana_ml",
         "email": "dana@example.com",
-        "topic_preferences": {"ai": 0.95, "backend": 0.4, "interview-prep": 0.6},
+        "bio": "Applied ML practitioner following LLM workflows, evaluation, and model serving patterns.",
+        "topic_preferences": {
+            "ai": 0.97,
+            "backend": 0.41,
+            "system-design": 0.52,
+            "devops": 0.33,
+            "interview-prep": 0.61,
+        },
     },
     {
         "username": "emma_fullstack",
         "email": "emma@example.com",
-        "topic_preferences": {"backend": 0.7, "ai": 0.5, "interview-prep": 0.8},
+        "bio": "Full-stack builder preparing for interviews while keeping up with backend and AI trends.",
+        "topic_preferences": {
+            "ai": 0.56,
+            "backend": 0.79,
+            "system-design": 0.63,
+            "devops": 0.48,
+            "interview-prep": 0.88,
+        },
     },
 ]
 
 
-async def seed_users():
+async def seed_users() -> None:
     """Seed demo users into the database."""
+
     print_step("USERS", "Connecting to database...")
     async_session, engine = await get_async_session()
-    
+
     try:
         async with async_session() as session:
-            # Check if users already exist
-            query = select(User)
-            result = await session.execute(query)
-            existing_users = result.scalars().all()
-            
-            if existing_users:
-                print_step("USERS", f"Found {len(existing_users)} existing users. Skipping user creation.")
-                return
-            
-            print_step("USERS", "Creating demo users...")
-            
-            created_count = 0
-            for user_data in DEMO_USERS:
-                try:
-                    # Create user
-                    user = User(
-                        username=user_data["username"],
-                        email=user_data["email"],
+            existing_usernames = set(
+                (
+                    await session.execute(
+                        select(User.username).where(
+                            User.username.in_([user["username"] for user in DEMO_USERS])
+                        )
                     )
-                    session.add(user)
-                    await session.flush()
-                    
-                    # Create profile
-                    profile = UserProfile(
+                )
+                .scalars()
+                .all()
+            )
+
+            created_count = 0
+            skipped_count = 0
+
+            print_step("USERS", "Ensuring demo users exist...")
+            for user_data in DEMO_USERS:
+                if user_data["username"] in existing_usernames:
+                    skipped_count += 1
+                    print(f"  ↷ Skipped existing user: {user_data['username']}")
+                    continue
+
+                user = User(
+                    username=user_data["username"],
+                    email=user_data["email"],
+                )
+                session.add(user)
+                await session.flush()
+
+                session.add(
+                    UserProfile(
                         user_id=user.id,
-                        bio=f"Demo user for {user_data['username']}",
+                        bio=user_data["bio"],
                         topic_preferences=user_data["topic_preferences"],
                     )
-                    session.add(profile)
-                    
-                    created_count += 1
-                    print(f"  → Created user: {user_data['username']} ({user_data['email']})")
-                except Exception as e:
-                    print(f"  ! Failed to create user {user_data['username']}: {e}")
-            
+                )
+                created_count += 1
+                print(f"  → Created user: {user_data['username']} ({user_data['email']})")
+
             await session.commit()
-            print_step("USERS", f"Successfully created {created_count} demo users")
-            
+            print_step(
+                "USERS",
+                f"Created {created_count} demo users, skipped {skipped_count} existing users",
+            )
     except Exception as e:
         print_error(f"Failed to seed users: {e}")
         raise

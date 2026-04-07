@@ -7,6 +7,8 @@ This directory contains seed scripts for populating demo data into the system.
 The seed scripts provide deterministic demo data for development and testing:
 - **5 demo users** with topic preferences
 - **50+ tech learning content items** across 5 categories
+- **10 reusable content tags** spanning taxonomy and filtering
+- A mix of **draft** and **published** content items
 
 ## Usage
 
@@ -61,13 +63,28 @@ python scripts/seed_users.py && python scripts/seed_content.py
 - **AI** (12 items): LLMs, embeddings, prompt engineering, RAG, transformers, etc.
 - **Backend** (12 items): REST APIs, databases, caching, messaging, microservices, etc.
 - **System Design** (11 items): Scalability, CAP theorem, consistency, load balancing, etc.
-- **DevOps** (9 items): CI/CD, Kubernetes, Docker, infrastructure as code, monitoring, etc.
+- **DevOps** (10 items): CI/CD, Kubernetes, Docker, infrastructure as code, monitoring, etc.
 - **Interview Prep** (6 items): Coding patterns, system design, behavioral prep, etc.
+
+### Content Tags
+
+The content seed also creates reusable tags such as:
+
+- `ai`
+- `llm`
+- `backend`
+- `system-design`
+- `devops`
+- `interview-prep`
+- `databases`
+- `distributed-systems`
+- `api-design`
+- `kubernetes`
 
 ## Idempotency
 
 The seed scripts are idempotent:
-- If data already exists, scripts will skip creation
+- Existing demo records are skipped individually
 - Safe to run multiple times
 - Useful for resetting specific data without full database wipe
 
