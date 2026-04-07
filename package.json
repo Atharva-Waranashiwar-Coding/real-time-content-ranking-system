@@ -1,0 +1,20 @@
+{
+  "name": "real-time-content-ranking-system",
+  "version": "0.1.0",
+  "description": "A distributed event-driven content ranking platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "type-check": "turbo run type-check"
+  },
+  "devDependencies": {
+    "turbo": "^1.10.0"
+  }
+}
