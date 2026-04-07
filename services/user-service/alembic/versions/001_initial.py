@@ -1,13 +1,12 @@
 """Initial migration for user-service: create users and user_profiles tables.
 
 Revision ID: 001
-Revises: 
+Revises:
 Create Date: 2026-04-07 19:00:00.000000
 
 """
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '001'
@@ -37,7 +36,7 @@ def upgrade() -> None:
         sa.Column('id', sa.String(36), nullable=False, primary_key=True),
         sa.Column('user_id', sa.String(36), nullable=False, unique=True),
         sa.Column('bio', sa.String(500), nullable=True),
-        sa.Column('topic_preferences', sa.JSON, nullable=False),
+        sa.Column('topic_preferences', sa.JSON, nullable=False, server_default=sa.text("'{}'")),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
@@ -49,7 +48,7 @@ def downgrade() -> None:
     """Drop tables in reverse order."""
     op.drop_index(op.f('ix_user_profiles_user_id'), table_name='user_profiles')
     op.drop_table('user_profiles')
-    
+
     op.drop_index(op.f('ix_users_created_at'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_index(op.f('ix_users_username'), table_name='users')

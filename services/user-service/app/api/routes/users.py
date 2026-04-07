@@ -1,19 +1,34 @@
 """API routes for user endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
-from app.services import UserService
 from app.schemas.user import (
-    UserCreateRequest,
-    UserUpdateRequest,
-    UserProfileUpdateRequest,
     TopicPreferencesUpdateRequest,
-    UserResponse,
+    UserCreateRequest,
     UserProfileResponse,
+    UserProfileUpdateRequest,
+    UserResponse,
+    UserUpdateRequest,
 )
+from app.services import UserService
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
+
+
+def _raise_bad_request(detail: str) -> None:
+    """Raise a standard 400 API error."""
+
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+def _raise_not_found(resource_name: str, resource_id: str) -> None:
+    """Raise a standard 404 API error."""
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"{resource_name} '{resource_id}' not found",
+    )
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -26,10 +41,7 @@ async def create_user(
     try:
         return await service.create_user(request)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+        _raise_bad_request(str(e))
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -41,10 +53,7 @@ async def get_user(
     service = UserService(db)
     user = await service.get_user_by_id(user_id)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID '{user_id}' not found",
-        )
+        _raise_not_found("User", user_id)
     return user
 
 
@@ -59,16 +68,10 @@ async def update_user(
     try:
         updated_user = await service.update_user(user_id, request)
         if not updated_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User with ID '{user_id}' not found",
-            )
+            _raise_not_found("User", user_id)
         return updated_user
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+        _raise_bad_request(str(e))
 
 
 @router.get("/{user_id}/profile", response_model=UserProfileResponse)
@@ -80,10 +83,7 @@ async def get_profile(
     service = UserService(db)
     profile = await service.get_profile(user_id)
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Profile for user '{user_id}' not found",
-        )
+        _raise_not_found("Profile for user", user_id)
     return profile
 
 
@@ -98,16 +98,10 @@ async def update_profile(
     try:
         updated_profile = await service.update_profile(user_id, request)
         if not updated_profile:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Profile for user '{user_id}' not found",
-            )
+            _raise_not_found("Profile for user", user_id)
         return updated_profile
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+        _raise_bad_request(str(e))
 
 
 @router.put("/{user_id}/topics", response_model=UserProfileResponse)
@@ -119,24 +113,18 @@ async def update_topics(
     """Update user topic preferences."""
     service = UserService(db)
     try:
-        updated_profile = await service.update_topic_preferences(user_id, request.topic_preferences)
+        updated_profile = await service.update_topic_preferences(user_id, request)
         if not updated_profile:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Profile for user '{user_id}' not found",
-            )
+            _raise_not_found("Profile for user", user_id)
         return updated_profile
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+        _raise_bad_request(str(e))
 
 
 @router.get("", response_model=list[UserResponse])
 async def list_users(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
 ) -> list[UserResponse]:
     """List all users with pagination."""

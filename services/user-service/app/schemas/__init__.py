@@ -1,18 +1,20 @@
 """Schemas for user-service."""
 
 from app.schemas.user import (
-    UserCreateRequest,
-    UserUpdateRequest,
-    UserProfileUpdateRequest,
     TopicPreferencesUpdateRequest,
-    UserProfileResponse,
-    UserResponse,
+    UserCreateRequest,
     UserDetailResponse,
+    UserProfileCreateRequest,
+    UserProfileResponse,
+    UserProfileUpdateRequest,
+    UserResponse,
+    UserUpdateRequest,
 )
 
 __all__ = [
     "UserCreateRequest",
     "UserUpdateRequest",
+    "UserProfileCreateRequest",
     "UserProfileUpdateRequest",
     "TopicPreferencesUpdateRequest",
     "UserProfileResponse",
