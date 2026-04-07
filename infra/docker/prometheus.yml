@@ -1,0 +1,63 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Backend services will register their metrics endpoints here
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'content-service'
+    static_configs:
+      - targets: ['content-service:8002']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'interaction-service'
+    static_configs:
+      - targets: ['interaction-service:8003']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'feed-service'
+    static_configs:
+      - targets: ['feed-service:8004']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'ranking-service'
+    static_configs:
+      - targets: ['ranking-service:8005']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'experimentation-service'
+    static_configs:
+      - targets: ['experimentation-service:8006']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['analytics-service:8007']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'feature-processor'
+    static_configs:
+      - targets: ['feature-processor:8008']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
