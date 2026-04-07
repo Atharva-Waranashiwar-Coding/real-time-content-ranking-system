@@ -18,6 +18,23 @@ class InteractionEventType(str, Enum):
     WATCH_COMPLETE = "watch_complete"
 
 
+class ContentCategory(str, Enum):
+    """Content categories for tech learning feed."""
+
+    AI = "ai"
+    BACKEND = "backend"
+    SYSTEM_DESIGN = "system-design"
+    DEVOPS = "devops"
+    INTERVIEW_PREP = "interview-prep"
+
+
+class ContentStatus(str, Enum):
+    """Status of content items."""
+
+    DRAFT = "draft"
+    PUBLISHED = "published"
+
+
 class InteractionEventSchema(BaseModel):
     """Event schema for user interactions."""
 
@@ -64,6 +81,8 @@ class PaginationParams(BaseModel):
 
 __all__ = [
     "InteractionEventType",
+    "ContentCategory",
+    "ContentStatus",
     "InteractionEventSchema",
     "HealthCheckResponse",
     "ErrorResponse",
