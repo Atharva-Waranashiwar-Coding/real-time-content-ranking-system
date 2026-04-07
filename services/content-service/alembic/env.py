@@ -5,11 +5,12 @@ This file contains the logic to manage database schemas.
 
 import logging
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+
 from alembic import context
-from app.db.base import Base
+from app import models  # noqa: F401
 from app.core.config import config
+from app.db.base import Base
+from sqlalchemy import engine_from_config, pool
 
 # This is the Alembic Config object, which provides the values to the needed placeholders
 alembic_cfg = context.config

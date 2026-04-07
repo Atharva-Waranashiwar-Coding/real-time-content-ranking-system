@@ -1,13 +1,12 @@
 """Schemas for content-service."""
 
 from app.schemas.content import (
+    ContentItemCreateRequest,
+    ContentItemListResponse,
+    ContentItemResponse,
+    ContentItemUpdateRequest,
     ContentTagRequest,
     ContentTagResponse,
-    ContentItemCreateRequest,
-    ContentItemUpdateRequest,
-    ContentItemPublishRequest,
-    ContentItemResponse,
-    ContentItemListResponse,
 )
 
 __all__ = [
@@ -15,7 +14,6 @@ __all__ = [
     "ContentTagResponse",
     "ContentItemCreateRequest",
     "ContentItemUpdateRequest",
-    "ContentItemPublishRequest",
     "ContentItemResponse",
     "ContentItemListResponse",
 ]

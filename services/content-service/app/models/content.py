@@ -2,38 +2,42 @@
 
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, List
-from sqlalchemy import Column, String, DateTime, JSON, ForeignKey, Table, Integer
-from sqlalchemy.orm import relationship
+
 from app.db.base import Base
-from shared_schemas import ContentStatus
+from sqlalchemy import JSON, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Table
+from sqlalchemy.orm import relationship
 
 
-# Association table for many-to-many relationship between content items and tags
+def utc_now() -> datetime:
+    """Return the current UTC timestamp."""
+
+    return datetime.now(timezone.utc)
+
+
 content_tags_association = Table(
     "content_tags_association",
     Base.metadata,
-    Column("content_id", String(36), ForeignKey("content_items.id"), primary_key=True),
-    Column("tag_id", String(36), ForeignKey("content_tags.id"), primary_key=True),
+    Column("content_id", String(36), ForeignKey("content_items.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", String(36), ForeignKey("content_tags.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
 class ContentTag(Base):
-    """Content tag entity - used for organizing and filtering content."""
+    """Content tag entity used for filtering and taxonomy."""
 
     __tablename__ = "content_tags"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), unique=True, nullable=False, index=True)
     description = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
 
-    # Relationship
     content_items = relationship(
         "ContentItem",
         secondary=content_tags_association,
         back_populates="tags",
+        lazy="selectin",
     )
 
     def __repr__(self) -> str:
@@ -41,29 +45,37 @@ class ContentTag(Base):
 
 
 class ContentItem(Base):
-    """Content item entity - represents a piece of content in the system."""
+    """Content item entity for draft and published content metadata."""
 
     __tablename__ = "content_items"
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('ai', 'backend', 'system-design', 'devops', 'interview-prep')",
+            name="ck_content_items_category",
+        ),
+        CheckConstraint(
+            "status IN ('draft', 'published')",
+            name="ck_content_items_status",
+        ),
+    )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String(500), nullable=False, index=True)
     description = Column(String(2000), nullable=True)
-    topic = Column(String(100), nullable=False, index=True)  # e.g., "ai", "backend", "system-design"
-    category = Column(String(50), nullable=False, index=True)  # e.g., "ai", "backend", etc.
-    status = Column(String(20), nullable=False, default="draft", index=True)  # "draft" or "published"
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    topic = Column(String(100), nullable=False, index=True)
+    category = Column(String(50), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="draft", index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, index=True)
     published_at = Column(DateTime(timezone=True), nullable=True, index=True)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    
-    # Metadata for analytics and ranking
-    view_count = Column(Integer, default=0)
-    engagement_metadata = Column(JSON, nullable=False, default=dict)  # Stores engagement stats
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+    view_count = Column(Integer, nullable=False, default=0)
+    engagement_metadata = Column(JSON, nullable=False, default=dict)
 
-    # Relationships
     tags = relationship(
         "ContentTag",
         secondary=content_tags_association,
         back_populates="content_items",
+        lazy="selectin",
     )
 
     def __repr__(self) -> str:
