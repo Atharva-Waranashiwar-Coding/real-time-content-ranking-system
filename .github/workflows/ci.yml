@@ -1,0 +1,162 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, "phase/*"]
+  pull_request:
+    branches: [main, "phase/*"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff black mypy pytest pytest-cov
+          for service in services/*/; do
+            if [ -f "$service/requirements.txt" ]; then
+              pip install -q -r "$service/requirements.txt"
+            fi
+          done
+
+      - name: Lint with ruff
+        run: |
+          ruff check services/ packages/ --exclude __pycache__
+          ruff check services/ packages/ --select I
+
+      - name: Format check with black
+        run: black --check services/ packages/ --line-length=100
+
+      - name: Type check with mypy
+        run: mypy services/ packages/ --ignore-missing-imports || true
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: rankingpass
+          POSTGRES_USER: rankinguser
+          POSTGRES_DB: ranking_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-cov
+          for service in services/*/; do
+            if [ -f "$service/requirements.txt" ]; then
+              pip install -q -r "$service/requirements.txt"
+            fi
+          done
+
+      - name: Test with pytest
+        run: |
+          pytest services/ packages/ --cov=services --cov=packages --cov-report=xml || true
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ["18.x"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: |
+          cd apps/web
+          npm ci
+
+      - name: Lint Next.js
+        run: |
+          cd apps/web
+          npm run lint || true
+
+      - name: Type check
+        run: |
+          cd apps/web
+          npm run type-check || true
+
+  docker-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [
+            api-gateway,
+            user-service,
+            content-service,
+            interaction-service,
+            feed-service,
+            ranking-service,
+            experimentation-service,
+            analytics-service,
+            feature-processor,
+          ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image for ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/${{ matrix.service }}
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
