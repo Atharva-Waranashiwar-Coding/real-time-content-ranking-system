@@ -7,6 +7,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from time import perf_counter
 
 from app.core.config import config
 from app.core.metrics import (
@@ -26,8 +27,16 @@ from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared_clients import KafkaConsumer, KafkaConsumerError, KafkaRecord
-from shared_schemas import InteractionEventV1Schema, utc_now
+from shared_clients import (
+    KafkaConsumer,
+    KafkaConsumerError,
+    KafkaMessage,
+    KafkaProducer,
+    KafkaProducerError,
+    KafkaRecord,
+)
+from shared_logging import observe_consumer_lag, observe_event_operation
+from shared_schemas import DeadLetterEventV1Schema, InteractionEventV1Schema, utc_now
 
 logger = logging.getLogger(config.SERVICE_NAME)
 
@@ -190,6 +199,7 @@ class FeatureProcessorService:
         runtime_state: FeatureProcessorRuntimeState | None = None,
         snapshot_batch_size: int,
         snapshot_flush_interval_seconds: float,
+        dlq_producer: KafkaProducer | None = None,
     ):
         self.feature_store = feature_store
         self.snapshot_repository = snapshot_repository
@@ -198,6 +208,7 @@ class FeatureProcessorService:
         )
         self.snapshot_batch_size = snapshot_batch_size
         self.snapshot_flush_interval_seconds = snapshot_flush_interval_seconds
+        self.dlq_producer = dlq_producer
         self._dirty_content_features: dict[str, ContentFeatureRecord] = {}
         self._dirty_user_topic_features: dict[tuple[str, str], UserTopicAffinityRecord] = {}
         self._last_snapshot_flush_attempt = utc_now()
@@ -224,32 +235,12 @@ class FeatureProcessorService:
             while not self._shutdown.is_set():
                 record = await consumer.poll(config.KAFKA_POLL_TIMEOUT_SECONDS)
                 if record is None:
+                    await self._update_consumer_lag(consumer)
                     await self.maybe_flush_snapshots()
                     continue
 
                 event_context = EventProcessingContext.from_record(record)
-                should_commit = False
-                try:
-                    await self.process_record(record, event_context)
-                    should_commit = True
-                except InvalidInteractionEventError as exc:
-                    should_commit = True
-                    self.runtime_state.failed_events_total += 1
-                    EVENTS_FAILED_TOTAL.inc()
-                    logger.warning(
-                        "Dropping invalid interaction event from Kafka",
-                        extra={**event_context.to_log_fields(), "error": str(exc)},
-                    )
-                except Exception:
-                    self.runtime_state.failed_events_total += 1
-                    EVENTS_FAILED_TOTAL.inc()
-                    logger.exception(
-                        "Interaction feature processing failed",
-                        extra=event_context.to_log_fields(),
-                    )
-                    await asyncio.sleep(config.PROCESSOR_ERROR_BACKOFF_SECONDS)
-                else:
-                    await self.maybe_flush_snapshots()
+                should_commit = await self._handle_record(record, event_context)
 
                 if should_commit:
                     try:
@@ -260,6 +251,8 @@ class FeatureProcessorService:
                             extra=event_context.to_log_fields(),
                         )
                         await asyncio.sleep(config.PROCESSOR_ERROR_BACKOFF_SECONDS)
+
+                await self._update_consumer_lag(consumer)
         finally:
             await self.flush_snapshots(force=True)
             self.runtime_state.consumer_running = False
@@ -331,6 +324,200 @@ class FeatureProcessorService:
                     else None
                 ),
             },
+        )
+
+    async def _handle_record(
+        self,
+        record: KafkaRecord,
+        event_context: EventProcessingContext,
+    ) -> bool:
+        """Process a record with bounded retries and DLQ fallback."""
+
+        last_error: Exception | None = None
+
+        for attempt in range(1, config.PROCESSOR_MAX_PROCESSING_ATTEMPTS + 1):
+            started_at = perf_counter()
+            try:
+                await self.process_record(record, event_context)
+            except InvalidInteractionEventError as exc:
+                self.runtime_state.failed_events_total += 1
+                EVENTS_FAILED_TOTAL.inc()
+                observe_event_operation(
+                    service_name=config.SERVICE_NAME,
+                    operation="consume",
+                    topic=record.topic,
+                    outcome="invalid",
+                    duration_seconds=perf_counter() - started_at,
+                )
+                logger.warning(
+                    "Dropping invalid interaction event from Kafka",
+                    extra={
+                        **event_context.to_log_fields(),
+                        "error": str(exc),
+                        "attempt_count": attempt,
+                    },
+                )
+                return await self._publish_dead_letter(record, event_context, exc, attempt)
+            except Exception as exc:
+                last_error = exc
+                if attempt < config.PROCESSOR_MAX_PROCESSING_ATTEMPTS:
+                    logger.warning(
+                        "Retrying interaction feature processing after failure",
+                        extra={
+                            **event_context.to_log_fields(),
+                            "attempt_count": attempt,
+                            "backoff_seconds": self._processing_backoff_seconds(attempt),
+                        },
+                    )
+                    await asyncio.sleep(self._processing_backoff_seconds(attempt))
+                    continue
+
+                self.runtime_state.failed_events_total += 1
+                EVENTS_FAILED_TOTAL.inc()
+                observe_event_operation(
+                    service_name=config.SERVICE_NAME,
+                    operation="consume",
+                    topic=record.topic,
+                    outcome="failure",
+                    duration_seconds=perf_counter() - started_at,
+                )
+                logger.exception(
+                    "Interaction feature processing failed after retries",
+                    extra={
+                        **event_context.to_log_fields(),
+                        "attempt_count": attempt,
+                    },
+                )
+                return await self._publish_dead_letter(record, event_context, exc, attempt)
+
+            observe_event_operation(
+                service_name=config.SERVICE_NAME,
+                operation="consume",
+                topic=record.topic,
+                outcome="success",
+                duration_seconds=perf_counter() - started_at,
+            )
+            await self.maybe_flush_snapshots()
+            return True
+
+        if last_error is not None:
+            logger.exception(
+                "Interaction feature processing exhausted without commit decision",
+                extra=event_context.to_log_fields(),
+            )
+        return False
+
+    async def _publish_dead_letter(
+        self,
+        record: KafkaRecord,
+        event_context: EventProcessingContext,
+        error: Exception,
+        attempt_count: int,
+    ) -> bool:
+        """Publish the failed Kafka record to the configured dead-letter topic."""
+
+        if self.dlq_producer is None:
+            logger.error(
+                "Dead-letter publish skipped because no DLQ producer is configured",
+                extra={
+                    **event_context.to_log_fields(),
+                    "error_type": type(error).__name__,
+                    "attempt_count": attempt_count,
+                },
+            )
+            return False
+
+        dead_letter_event = DeadLetterEventV1Schema(
+            source_topic=record.topic,
+            source_partition=record.partition,
+            source_offset=record.offset,
+            source_key=record.key,
+            source_headers=dict(record.headers),
+            failed_service=config.SERVICE_NAME,
+            error_type=type(error).__name__,
+            error_message=str(error),
+            payload=dict(record.value),
+            request_id=event_context.request_id,
+            correlation_id=event_context.correlation_id,
+            attempt_count=attempt_count,
+        )
+        started_at = perf_counter()
+
+        try:
+            await self.dlq_producer.publish(
+                KafkaMessage(
+                    topic=config.KAFKA_DLQ_TOPIC,
+                    key=record.key,
+                    value=dead_letter_event.model_dump(mode="json"),
+                    headers={
+                        "schema-name": dead_letter_event.schema_name,
+                        "source-topic": record.topic,
+                        "request-id": event_context.request_id or "",
+                        "correlation-id": event_context.correlation_id or "",
+                    },
+                )
+            )
+        except KafkaProducerError:
+            observe_event_operation(
+                service_name=config.SERVICE_NAME,
+                operation="dlq_publish",
+                topic=config.KAFKA_DLQ_TOPIC,
+                outcome="failure",
+                duration_seconds=perf_counter() - started_at,
+            )
+            logger.exception(
+                "Dead-letter publish failed",
+                extra={
+                    **event_context.to_log_fields(),
+                    "attempt_count": attempt_count,
+                    "dlq_topic": config.KAFKA_DLQ_TOPIC,
+                },
+            )
+            return False
+
+        observe_event_operation(
+            service_name=config.SERVICE_NAME,
+            operation="dlq_publish",
+            topic=config.KAFKA_DLQ_TOPIC,
+            outcome="success",
+            duration_seconds=perf_counter() - started_at,
+        )
+        logger.warning(
+            "Published failed interaction record to dead-letter topic",
+            extra={
+                **event_context.to_log_fields(),
+                "attempt_count": attempt_count,
+                "dlq_topic": config.KAFKA_DLQ_TOPIC,
+                "error_type": type(error).__name__,
+            },
+        )
+        return True
+
+    async def _update_consumer_lag(self, consumer: KafkaConsumer) -> None:
+        """Refresh consumer lag gauges for the currently assigned partitions."""
+
+        try:
+            snapshots = await consumer.lag_snapshots()
+        except Exception:
+            logger.warning("Unable to refresh Kafka consumer lag metrics")
+            return
+
+        for snapshot in snapshots:
+            observe_consumer_lag(
+                service_name=config.SERVICE_NAME,
+                group_id=snapshot.group_id,
+                topic=snapshot.topic,
+                partition=snapshot.partition,
+                lag=snapshot.lag,
+            )
+
+    @staticmethod
+    def _processing_backoff_seconds(attempt_count: int) -> float:
+        """Return the bounded backoff before retrying a failed record."""
+
+        return min(
+            config.PROCESSOR_ERROR_BACKOFF_SECONDS * (2 ** (attempt_count - 1)),
+            10.0,
         )
 
     async def maybe_flush_snapshots(self) -> None:

@@ -37,6 +37,13 @@ async def health_check(request: Request):
     return get_runtime_state(request).to_response(status="starting")
 
 
+@router.get("/live", response_model=ProcessorHealthResponse)
+async def liveness_check(request: Request):
+    """Return liveness with the current runtime state."""
+
+    return get_runtime_state(request).to_response(status="alive")
+
+
 @router.get("/ready", response_model=ProcessorHealthResponse)
 async def readiness_check(request: Request, response: Response):
     """Return readiness based on dependency status and consumer availability."""

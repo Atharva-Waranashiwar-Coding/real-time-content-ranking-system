@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 
 from app.api.routes import experiments_router, health_router
 from app.core import build_request_context, config
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from shared_logging import setup_logging
+from shared_logging import build_metrics_router, install_http_observability, setup_logging
 
 logger = setup_logging(config.SERVICE_NAME, config.LOG_LEVEL)
 
@@ -42,29 +42,19 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def attach_request_context(request: Request, call_next):
-    """Attach request-scoped identifiers to the request and response."""
-
-    request_context = build_request_context(request)
-    request.state.request_context = request_context
-
-    response = await call_next(request)
-    response.headers[config.REQUEST_ID_HEADER] = request_context.request_id
-    response.headers[config.CORRELATION_ID_HEADER] = request_context.correlation_id
-
-    logger.info(
-        "HTTP request completed",
-        extra={
-            **request_context.to_log_fields(),
-            "status_code": response.status_code,
-        },
-    )
-    return response
+install_http_observability(
+    app,
+    service_name=config.SERVICE_NAME,
+    logger=logger,
+    build_request_context=build_request_context,
+    request_id_header=config.REQUEST_ID_HEADER,
+    correlation_id_header=config.CORRELATION_ID_HEADER,
+)
 
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(experiments_router)
+app.include_router(build_metrics_router())
 
 
 @app.get("/")

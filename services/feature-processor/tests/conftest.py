@@ -126,6 +126,23 @@ class InMemoryRedis:
         return len(removable_members)
 
 
+class FakeKafkaProducer:
+    """Async Kafka producer test double used for DLQ publication."""
+
+    def __init__(self):
+        self.messages = []
+
+    async def publish(self, message) -> None:
+        """Record the published Kafka message."""
+
+        self.messages.append(message)
+
+    async def close(self) -> None:
+        """Close the fake producer."""
+
+        return None
+
+
 @pytest.fixture
 def fake_redis() -> InMemoryRedis:
     """Return an in-memory Redis test double."""
@@ -180,6 +197,7 @@ def client(
     """Create a TestClient using the fake Redis store and SQLite snapshots."""
 
     app.state.redis_client = fake_redis
+    app.state.kafka_producer = FakeKafkaProducer()
     app.state.feature_processor_runtime_state = processor_service.runtime_state
     app.state.feature_processor = processor_service
     app.state.feature_processor_should_start_consumer = False
@@ -194,6 +212,7 @@ def client(
         "feature_processor",
         "feature_processor_runtime_state",
         "feature_processor_should_start_consumer",
+        "kafka_producer",
         "redis_client",
     ):
         if hasattr(app.state, attribute_name):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from time import perf_counter
 
 from app.core.config import config
 from app.core.request_context import RequestContext
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from shared_clients import KafkaMessage, KafkaProducer, KafkaProducerError
+from shared_logging import observe_event_operation
 from shared_schemas import INTERACTIONS_EVENTS_V1_TOPIC, utc_now
 
 logger = logging.getLogger(config.SERVICE_NAME)
@@ -40,6 +42,7 @@ class InteractionService:
     ) -> InteractionIngestResponse:
         """Persist an interaction event and publish it to Kafka."""
 
+        publish_started_at = perf_counter()
         persisted_interaction = Interaction(
             event_id=str(event.event_id),
             schema_name=event.schema_name,
@@ -106,6 +109,13 @@ class InteractionService:
         try:
             await self.event_producer.publish(kafka_message)
         except KafkaProducerError as exc:
+            observe_event_operation(
+                service_name=config.SERVICE_NAME,
+                operation="publish",
+                topic=INTERACTIONS_EVENTS_V1_TOPIC,
+                outcome="failure",
+                duration_seconds=perf_counter() - publish_started_at,
+            )
             logger.error(
                 "Kafka publish failed for interaction event",
                 extra={
@@ -119,6 +129,14 @@ class InteractionService:
             raise InteractionPublishError(
                 "Interaction persisted but Kafka publish failed; retry is required"
             ) from exc
+
+        observe_event_operation(
+            service_name=config.SERVICE_NAME,
+            operation="publish",
+            topic=INTERACTIONS_EVENTS_V1_TOPIC,
+            outcome="success",
+            duration_seconds=perf_counter() - publish_started_at,
+        )
 
         persisted_interaction.published_at = utc_now()
         await self.session.commit()

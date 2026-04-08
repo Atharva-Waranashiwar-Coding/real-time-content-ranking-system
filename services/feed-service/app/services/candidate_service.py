@@ -31,8 +31,20 @@ class CandidateService:
 
     async def retrieve_candidates(self, user_id: str) -> list[RankingCandidateV1Schema]:
         """Retrieve deduplicated feed candidates for a user."""
+        return await self._retrieve_candidates(user_id, headers=None)
 
-        effective_topic_affinity = await self._get_effective_topic_affinity(user_id)
+    async def _retrieve_candidates(
+        self,
+        user_id: str,
+        *,
+        headers: dict[str, str] | None,
+    ) -> list[RankingCandidateV1Schema]:
+        """Retrieve deduplicated feed candidates for a user with request headers."""
+
+        effective_topic_affinity = await self._get_effective_topic_affinity(
+            user_id,
+            headers=headers,
+        )
         top_topics = [
             topic
             for topic, affinity_score in sorted(
@@ -44,10 +56,12 @@ class CandidateService:
         ][: config.FEED_MAX_TOPIC_SOURCES]
 
         recent_items = await self.content_client.list_published_content(
-            limit=config.FEED_RECENT_CANDIDATE_LIMIT
+            limit=config.FEED_RECENT_CANDIDATE_LIMIT,
+            headers=headers,
         )
         trending_seed_items = await self.content_client.list_published_content(
-            limit=config.FEED_TRENDING_SEED_LIMIT
+            limit=config.FEED_TRENDING_SEED_LIMIT,
+            headers=headers,
         )
 
         topic_source_items: list[UpstreamContentItem] = []
@@ -56,6 +70,7 @@ class CandidateService:
                 await self.content_client.list_published_content(
                     limit=config.FEED_TOPIC_CANDIDATE_LIMIT,
                     topic=topic,
+                    headers=headers,
                 )
             )
 
@@ -103,11 +118,26 @@ class CandidateService:
             if content_id in source_map
         ]
 
-    async def _get_effective_topic_affinity(self, user_id: str) -> dict[str, float]:
+    async def get_candidates(
+        self,
+        user_id: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> list[RankingCandidateV1Schema]:
+        """Public entry point that preserves header propagation."""
+
+        return await self._retrieve_candidates(user_id, headers=headers)
+
+    async def _get_effective_topic_affinity(
+        self,
+        user_id: str,
+        *,
+        headers: dict[str, str] | None,
+    ) -> dict[str, float]:
         """Blend runtime topic affinity with profile preferences."""
 
         runtime_topic_affinity = await self.feature_store.read_user_topic_affinity(user_id)
-        user = await self.user_client.get_user(user_id)
+        user = await self.user_client.get_user(user_id, headers=headers)
         profile_affinity = user.profile.topic_preferences if user.profile is not None else {}
 
         normalized_runtime_affinity = self._normalize_runtime_affinity(runtime_topic_affinity)

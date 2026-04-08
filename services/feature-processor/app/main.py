@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from app.api.routes import health_router, metrics_router
-from app.core.config import config
+from app.core import build_request_context, config
 from app.db import async_session
 from app.services import (
     FeatureProcessorRuntimeState,
@@ -17,8 +17,8 @@ from app.services import (
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from shared_clients import create_kafka_consumer
-from shared_logging import setup_logging
+from shared_clients import create_kafka_consumer, create_kafka_producer
+from shared_logging import install_http_observability, setup_logging
 
 logger = setup_logging(config.SERVICE_NAME, config.LOG_LEVEL)
 
@@ -69,6 +69,19 @@ def _ensure_kafka_consumer(app: FastAPI) -> bool:
     return True
 
 
+def _ensure_kafka_producer(app: FastAPI) -> bool:
+    """Create the Kafka producer used for dead-letter publication."""
+
+    if hasattr(app.state, "kafka_producer"):
+        return False
+
+    app.state.kafka_producer = create_kafka_producer(
+        bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
+        client_id=config.SERVICE_NAME,
+    )
+    return True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
@@ -93,6 +106,8 @@ async def lifespan(app: FastAPI):
     created_kafka_consumer = (
         config.FEATURE_PROCESSOR_START_CONSUMER and _ensure_kafka_consumer(app)
     )
+    created_kafka_producer = _ensure_kafka_producer(app)
+    app.state.feature_processor.dlq_producer = app.state.kafka_producer
 
     consumer_task: asyncio.Task | None = None
     if config.FEATURE_PROCESSOR_START_CONSUMER:
@@ -120,6 +135,10 @@ async def lifespan(app: FastAPI):
             await app.state.kafka_consumer.close()
             del app.state.kafka_consumer
 
+        if created_kafka_producer and getattr(app.state, "kafka_producer", None) is not None:
+            await app.state.kafka_producer.close()
+            del app.state.kafka_producer
+
         if created_redis_client and getattr(app.state, "redis_client", None) is not None:
             await app.state.redis_client.aclose()
             del app.state.redis_client
@@ -142,6 +161,15 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+install_http_observability(
+    app,
+    service_name=config.SERVICE_NAME,
+    logger=logger,
+    build_request_context=build_request_context,
+    request_id_header=config.REQUEST_ID_HEADER,
+    correlation_id_header=config.CORRELATION_ID_HEADER,
 )
 
 app.include_router(health_router, prefix="/api/v1")

@@ -1,8 +1,10 @@
 """Health check endpoints for ranking-service."""
 
-from fastapi import APIRouter
+from app.core import config
+from fastapi import APIRouter, Request, Response, status
 
-from shared_schemas import HealthCheckResponse, utc_now
+from shared_logging import build_health_response
+from shared_schemas import HealthCheckResponse
 
 router = APIRouter(tags=["health"])
 
@@ -10,18 +12,24 @@ router = APIRouter(tags=["health"])
 @router.get("/health", response_model=HealthCheckResponse)
 async def health_check():
     """Check service health."""
-    return HealthCheckResponse(
-        status="healthy",
-        service="ranking-service",
-        timestamp=utc_now(),
-    )
+    return build_health_response(service_name=config.SERVICE_NAME, status="healthy")
+
+
+@router.get("/live", response_model=HealthCheckResponse)
+async def liveness_check():
+    """Check service liveness."""
+
+    return build_health_response(service_name=config.SERVICE_NAME, status="alive")
 
 
 @router.get("/ready", response_model=HealthCheckResponse)
-async def readiness_check():
+async def readiness_check(request: Request, response: Response):
     """Check service readiness."""
-    return HealthCheckResponse(
-        status="ready",
-        service="ranking-service",
-        timestamp=utc_now(),
+    producer_available = getattr(request.app.state, "kafka_producer", None) is not None
+    if not producer_available:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    return build_health_response(
+        service_name=config.SERVICE_NAME,
+        status="ready" if producer_available else "degraded",
     )

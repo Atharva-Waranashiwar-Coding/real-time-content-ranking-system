@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from time import perf_counter
 
 from app.core import RequestContext, config
 from app.schemas import FeedQueryParams, FeedResponse
@@ -14,6 +15,7 @@ from app.services.upstream_clients import (
 )
 from httpx import HTTPError
 
+from shared_logging import observe_feed_assembly_duration
 from shared_schemas import (
     ExperimentExposureCreateV1Schema,
     ExperimentExposureItemV1Schema,
@@ -52,6 +54,7 @@ class FeedService:
     ) -> FeedResponse:
         """Return a paginated personalized feed for a user."""
 
+        started_at = perf_counter()
         headers = {
             config.REQUEST_ID_HEADER: request_context.request_id,
             config.CORRELATION_ID_HEADER: request_context.correlation_id,
@@ -81,14 +84,23 @@ class FeedService:
                     "experiment_assignment": experiment_assignment,
                 }
             )
-            return await self._record_exposure(
+            delivered_feed = await self._record_exposure(
                 cached_feed,
                 session_id=query_params.session_id,
                 request_context=request_context,
             )
+            observe_feed_assembly_duration(
+                service_name=config.SERVICE_NAME,
+                cache_hit=True,
+                duration_seconds=perf_counter() - started_at,
+            )
+            return delivered_feed
 
         try:
-            candidates = await self.candidate_service.retrieve_candidates(str(query_params.user_id))
+            candidates = await self.candidate_service.get_candidates(
+                str(query_params.user_id),
+                headers=headers,
+            )
         except HTTPError as exc:
             raise FeedAssemblyError(
                 "Feed candidate retrieval failed due to an upstream dependency"
@@ -114,11 +126,17 @@ class FeedService:
                 empty_feed.model_dump(mode="json"),
                 self.cache_ttl_seconds,
             )
-            return await self._record_exposure(
+            delivered_feed = await self._record_exposure(
                 empty_feed,
                 session_id=query_params.session_id,
                 request_context=request_context,
             )
+            observe_feed_assembly_duration(
+                service_name=config.SERVICE_NAME,
+                cache_hit=False,
+                duration_seconds=perf_counter() - started_at,
+            )
+            return delivered_feed
 
         ranking_request = RankingRequestV1Schema(
             user_id=query_params.user_id,
@@ -183,11 +201,17 @@ class FeedService:
                 "strategy_name": experiment_assignment.strategy_name,
             },
         )
-        return await self._record_exposure(
+        delivered_feed = await self._record_exposure(
             feed_response,
             session_id=query_params.session_id,
             request_context=request_context,
         )
+        observe_feed_assembly_duration(
+            service_name=config.SERVICE_NAME,
+            cache_hit=False,
+            duration_seconds=perf_counter() - started_at,
+        )
+        return delivered_feed
 
     async def _record_exposure(
         self,

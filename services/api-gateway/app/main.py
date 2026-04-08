@@ -1,12 +1,13 @@
 """Main application for api-gateway."""
 
-import logging
 from contextlib import asynccontextmanager
+
+from app.api.routes import health
+from app.core import build_request_context, config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from shared_logging import setup_logging
-from app.core.config import config
-from app.api.routes import health
+
+from shared_logging import build_metrics_router, install_http_observability, setup_logging
 
 logger = setup_logging(config.SERVICE_NAME, config.LOG_LEVEL)
 
@@ -14,9 +15,16 @@ logger = setup_logging(config.SERVICE_NAME, config.LOG_LEVEL)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
-    logger.info(f"Starting {config.SERVICE_NAME} on port {config.SERVICE_PORT}")
+
+    logger.info(
+        "Starting api-gateway",
+        extra={"service_name": config.SERVICE_NAME, "service_port": config.SERVICE_PORT},
+    )
     yield
-    logger.info(f"Shutting down {config.SERVICE_NAME}")
+    logger.info(
+        "Shutting down api-gateway",
+        extra={"service_name": config.SERVICE_NAME},
+    )
 
 
 app = FastAPI(
@@ -33,7 +41,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+install_http_observability(
+    app,
+    service_name=config.SERVICE_NAME,
+    logger=logger,
+    build_request_context=build_request_context,
+    request_id_header=config.REQUEST_ID_HEADER,
+    correlation_id_header=config.CORRELATION_ID_HEADER,
+)
+
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(build_metrics_router())
 
 
 @app.get("/")
@@ -44,7 +62,7 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",

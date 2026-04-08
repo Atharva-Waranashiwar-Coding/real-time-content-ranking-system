@@ -116,7 +116,7 @@ class FakeUserContextClient:
         self.user_response = user_response
         self.calls = 0
 
-    async def get_user(self, user_id: str):
+    async def get_user(self, user_id: str, *, headers: dict[str, str] | None = None):
         self.calls += 1
         return self.user_response
 
@@ -128,7 +128,13 @@ class FakeContentCatalogClient:
         self.items = items
         self.calls = []
 
-    async def list_published_content(self, *, limit: int, topic: str | None = None):
+    async def list_published_content(
+        self,
+        *,
+        limit: int,
+        topic: str | None = None,
+        headers: dict[str, str] | None = None,
+    ):
         self.calls.append({"limit": limit, "topic": topic})
         filtered_items = [
             item for item in self.items if topic is None or item.topic == topic

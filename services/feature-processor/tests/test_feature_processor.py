@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 from app.models import ContentFeatureSnapshot, UserTopicFeatureSnapshot
-from app.services import InvalidInteractionEventError
+from app.services import EventProcessingContext, InvalidInteractionEventError
 from sqlalchemy import select
 
 from shared_clients import KafkaRecord
@@ -130,6 +130,42 @@ class TestFeatureProcessor:
             asyncio.run(processor_service.process_record(invalid_record))
 
         assert fake_redis.hashes == {}
+
+    def test_invalid_record_is_published_to_dead_letter_topic(
+        self,
+        processor_service,
+    ):
+        """Invalid records should be committed through the DLQ path."""
+
+        class FakeProducer:
+            def __init__(self):
+                self.messages = []
+
+            async def publish(self, message) -> None:
+                self.messages.append(message)
+
+            async def close(self) -> None:
+                return None
+
+        invalid_record = KafkaRecord(
+            topic="interactions.events.v1",
+            key="user-1",
+            value={"event_id": str(uuid4()), "event_type": "click"},
+            headers={},
+            partition=0,
+            offset=3,
+        )
+        processor_service.dlq_producer = FakeProducer()
+
+        should_commit = asyncio.run(
+            processor_service._handle_record(
+                invalid_record,
+                EventProcessingContext.from_record(invalid_record),
+            )
+        )
+
+        assert should_commit is True
+        assert processor_service.dlq_producer.messages[0].topic == "interactions.events.dlq.v1"
 
     def test_health_and_metrics_endpoints(self, client):
         """Health and metrics routes should expose processor runtime state."""

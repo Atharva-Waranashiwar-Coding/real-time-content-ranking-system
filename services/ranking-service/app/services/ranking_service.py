@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from time import perf_counter
 from uuid import uuid4
 
 from app.core import RequestContext, config
@@ -10,6 +11,7 @@ from app.schemas import RankingRequest, RankingResponse
 from app.services.scoring import rank_candidates
 
 from shared_clients import KafkaMessage, KafkaProducer, KafkaProducerError
+from shared_logging import observe_event_operation, observe_ranking_duration
 from shared_schemas import (
     RANKING_DECISIONS_V1_TOPIC,
     RankingDecisionEventV1Schema,
@@ -36,6 +38,7 @@ class RankingService:
     ) -> RankingResponse:
         """Rank candidate items and publish the resulting decision event."""
 
+        started_at = perf_counter()
         generated_at = utc_now()
         decision_id = uuid4()
         ranked_items = rank_candidates(
@@ -80,6 +83,13 @@ class RankingService:
         try:
             await self.event_producer.publish(kafka_message)
         except KafkaProducerError as exc:
+            observe_event_operation(
+                service_name=config.SERVICE_NAME,
+                operation="publish",
+                topic=RANKING_DECISIONS_V1_TOPIC,
+                outcome="failure",
+                duration_seconds=perf_counter() - started_at,
+            )
             logger.error(
                 "Kafka publish failed for ranking decision event",
                 extra={
@@ -92,6 +102,20 @@ class RankingService:
             raise RankingDecisionPublishError(
                 "Ranking completed but decision event publication failed"
             ) from exc
+
+        total_duration_seconds = perf_counter() - started_at
+        observe_ranking_duration(
+            service_name=config.SERVICE_NAME,
+            strategy_name=request.strategy_name,
+            duration_seconds=total_duration_seconds,
+        )
+        observe_event_operation(
+            service_name=config.SERVICE_NAME,
+            operation="publish",
+            topic=RANKING_DECISIONS_V1_TOPIC,
+            outcome="success",
+            duration_seconds=total_duration_seconds,
+        )
 
         logger.info(
             "Ranking decision published",
