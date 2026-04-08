@@ -1,1 +1,4 @@
 /real_time_content_ranking_system_plan.md
+__pycache__/
+*.py[cod]
+.pytest_cache/
