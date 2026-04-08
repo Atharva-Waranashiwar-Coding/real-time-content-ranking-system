@@ -16,4 +16,6 @@ This directory documents the domain APIs implemented by the backend services cur
 - [user-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/user-service.md)
 - [content-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/content-service.md)
 - [interaction-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/interaction-service.md)
+- [ranking-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/ranking-service.md)
+- [feed-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/feed-service.md)
 - [feature-processor.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/feature-processor.md)
