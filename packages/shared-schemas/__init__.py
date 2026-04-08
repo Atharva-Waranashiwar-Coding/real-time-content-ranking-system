@@ -41,10 +41,24 @@ class ContentStatus(str, Enum):
     PUBLISHED = "published"
 
 
+class CandidateSource(str, Enum):
+    """Candidate retrieval source identifiers used by feed generation."""
+
+    RECENT = "recent"
+    TRENDING = "trending"
+    TOPIC_AFFINITY = "topic_affinity"
+
+
 INTERACTION_EVENT_V1_SCHEMA_NAME = "interaction_event.v1"
 INTERACTIONS_EVENTS_V1_TOPIC = "interactions.events.v1"
 CONTENT_FEATURES_V1_SCHEMA_NAME = "content_features.v1"
 USER_TOPIC_AFFINITY_V1_SCHEMA_NAME = "user_topic_affinity.v1"
+RANKING_REQUEST_V1_SCHEMA_NAME = "ranking_request.v1"
+RANKING_RESPONSE_V1_SCHEMA_NAME = "ranking_response.v1"
+RANKING_DECISION_V1_SCHEMA_NAME = "ranking_decision.v1"
+RANKING_DECISIONS_V1_TOPIC = "ranking.decisions.v1"
+FEED_RESPONSE_V1_SCHEMA_NAME = "feed_response.v1"
+RULES_BASED_RANKING_STRATEGY = "rules_based.v1"
 DEFAULT_FEATURE_WINDOW_HOURS = 24
 RANKING_TOPICS = tuple(category.value for category in ContentCategory)
 
@@ -428,6 +442,270 @@ class UserTopicAffinityV1Schema(BaseModel):
         return value.astimezone(timezone.utc)
 
 
+class RankingScoreBreakdownV1Schema(BaseModel):
+    """Explainable score breakdown for a ranked content item."""
+
+    user_topic_affinity: float = Field(default=0.0, ge=0.0, le=1.0)
+    user_topic_affinity_weighted: float = 0.0
+    recency: float = Field(default=0.0, ge=0.0, le=1.0)
+    recency_weighted: float = 0.0
+    engagement: float = Field(default=0.0, ge=0.0, le=1.0)
+    engagement_weighted: float = 0.0
+    trending: float = Field(default=0.0, ge=0.0, le=1.0)
+    trending_weighted: float = 0.0
+    diversity_penalty: float = Field(default=0.0, ge=0.0)
+    final_score: float = 0.0
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RankingCandidateV1Schema(BaseModel):
+    """Candidate item submitted to ranking-service for scoring."""
+
+    content_id: UUID
+    title: str = Field(..., min_length=1, max_length=500)
+    description: str | None = Field(default=None, max_length=2000)
+    topic: str = Field(..., min_length=1, max_length=100)
+    category: ContentCategory
+    published_at: datetime | None = None
+    candidate_sources: list[CandidateSource] = Field(default_factory=list)
+    user_topic_affinity: float = Field(default=0.0, ge=0.0, le=1.0)
+    content_features: ContentFeaturesV1Schema
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        """Normalize ranking candidate titles."""
+
+        return value.strip()
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def normalize_description(cls, value: str | None) -> str | None:
+        """Normalize optional ranking candidate descriptions."""
+
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("topic", mode="before")
+    @classmethod
+    def normalize_topic(cls, value: str) -> str:
+        """Normalize candidate topics for scoring consistency."""
+
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("Topic cannot be empty")
+        return normalized
+
+    @field_validator("candidate_sources")
+    @classmethod
+    def normalize_candidate_sources(
+        cls,
+        value: list[CandidateSource],
+    ) -> list[CandidateSource]:
+        """De-duplicate candidate sources while preserving order."""
+
+        deduplicated_sources: list[CandidateSource] = []
+        for source in value:
+            if source not in deduplicated_sources:
+                deduplicated_sources.append(source)
+        return deduplicated_sources
+
+    @field_validator("published_at")
+    @classmethod
+    def ensure_timezone_aware_published_at(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        """Coerce candidate publication timestamps to UTC."""
+
+        if value is None:
+            return None
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    @model_validator(mode="after")
+    def validate_feature_alignment(self) -> RankingCandidateV1Schema:
+        """Ensure the embedded feature vector matches the candidate item."""
+
+        if self.content_features.content_id != self.content_id:
+            raise ValueError("content_features.content_id must match content_id")
+        return self
+
+
+class RankedContentItemV1Schema(RankingCandidateV1Schema):
+    """Ranked content item returned by ranking-service and feed-service."""
+
+    rank: int = Field(..., ge=1)
+    score: float
+    score_breakdown: RankingScoreBreakdownV1Schema
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+
+class RankingRequestV1Schema(BaseModel):
+    """Versioned request payload sent to ranking-service."""
+
+    schema_name: str = Field(
+        default=RANKING_REQUEST_V1_SCHEMA_NAME,
+        description="Explicit schema identifier for ranking requests",
+    )
+    strategy_name: str = Field(
+        default=RULES_BASED_RANKING_STRATEGY,
+        min_length=1,
+        max_length=100,
+    )
+    user_id: UUID
+    candidates: list[RankingCandidateV1Schema] = Field(default_factory=list)
+    apply_diversity_penalty: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        """Keep the ranking request schema identifier explicit and versioned."""
+
+        if value != RANKING_REQUEST_V1_SCHEMA_NAME:
+            raise ValueError(
+                f"schema_name must be '{RANKING_REQUEST_V1_SCHEMA_NAME}'"
+            )
+        return value
+
+
+class RankingResponseV1Schema(BaseModel):
+    """Versioned response payload returned by ranking-service."""
+
+    schema_name: str = Field(
+        default=RANKING_RESPONSE_V1_SCHEMA_NAME,
+        description="Explicit schema identifier for ranking responses",
+    )
+    decision_id: UUID
+    strategy_name: str = RULES_BASED_RANKING_STRATEGY
+    user_id: UUID
+    candidate_count: int = Field(default=0, ge=0)
+    ranked_items: list[RankedContentItemV1Schema] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=utc_now)
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        """Keep the ranking response schema identifier explicit and versioned."""
+
+        if value != RANKING_RESPONSE_V1_SCHEMA_NAME:
+            raise ValueError(
+                f"schema_name must be '{RANKING_RESPONSE_V1_SCHEMA_NAME}'"
+            )
+        return value
+
+    @field_validator("generated_at")
+    @classmethod
+    def ensure_timezone_aware_generated_at(cls, value: datetime) -> datetime:
+        """Coerce response timestamps to UTC."""
+
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
+class RankingDecisionEventV1Schema(BaseModel):
+    """Versioned ranking decision event emitted by ranking-service."""
+
+    schema_name: str = Field(
+        default=RANKING_DECISION_V1_SCHEMA_NAME,
+        description="Explicit schema identifier for ranking decision events",
+    )
+    decision_id: UUID
+    strategy_name: str = RULES_BASED_RANKING_STRATEGY
+    user_id: UUID
+    candidate_count: int = Field(default=0, ge=0)
+    ranked_items: list[RankedContentItemV1Schema] = Field(default_factory=list)
+    request_id: str
+    correlation_id: str
+    generated_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        """Keep the ranking decision schema identifier explicit and versioned."""
+
+        if value != RANKING_DECISION_V1_SCHEMA_NAME:
+            raise ValueError(
+                f"schema_name must be '{RANKING_DECISION_V1_SCHEMA_NAME}'"
+            )
+        return value
+
+    @field_validator("request_id", "correlation_id", mode="before")
+    @classmethod
+    def normalize_request_identifiers(cls, value: str) -> str:
+        """Normalize trace identifiers included in ranking decision events."""
+
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("request_id and correlation_id cannot be empty")
+        return normalized
+
+    @field_validator("generated_at")
+    @classmethod
+    def ensure_timezone_aware_generated_at(cls, value: datetime) -> datetime:
+        """Coerce decision timestamps to UTC."""
+
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
+class FeedResponseV1Schema(BaseModel):
+    """Versioned feed response returned by feed-service."""
+
+    schema_name: str = Field(
+        default=FEED_RESPONSE_V1_SCHEMA_NAME,
+        description="Explicit schema identifier for feed responses",
+    )
+    user_id: UUID
+    items: list[RankedContentItemV1Schema] = Field(default_factory=list)
+    total_candidates: int = Field(default=0, ge=0)
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+    has_more: bool = False
+    cache_hit: bool = False
+    generated_at: datetime = Field(default_factory=utc_now)
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        """Keep the feed response schema identifier explicit and versioned."""
+
+        if value != FEED_RESPONSE_V1_SCHEMA_NAME:
+            raise ValueError(
+                f"schema_name must be '{FEED_RESPONSE_V1_SCHEMA_NAME}'"
+            )
+        return value
+
+    @field_validator("generated_at")
+    @classmethod
+    def ensure_timezone_aware_generated_at(cls, value: datetime) -> datetime:
+        """Coerce feed timestamps to UTC."""
+
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
 class HealthCheckResponse(BaseModel):
     """Standard health check response."""
 
@@ -456,6 +734,7 @@ class PaginationParams(BaseModel):
 
 
 __all__ = [
+    "CandidateSource",
     "ContentCategory",
     "ContentFeaturesV1Schema",
     "ContentMetadataSchema",
@@ -464,6 +743,8 @@ __all__ = [
     "CONTENT_FEATURES_V1_SCHEMA_NAME",
     "DEFAULT_FEATURE_WINDOW_HOURS",
     "ErrorResponse",
+    "FEED_RESPONSE_V1_SCHEMA_NAME",
+    "FeedResponseV1Schema",
     "HealthCheckResponse",
     "INTERACTION_EVENT_V1_SCHEMA_NAME",
     "INTERACTIONS_EVENTS_V1_TOPIC",
@@ -472,7 +753,18 @@ __all__ = [
     "InteractionEventSchema",
     "InteractionEventType",
     "PaginationParams",
+    "RANKING_DECISION_V1_SCHEMA_NAME",
+    "RANKING_DECISIONS_V1_TOPIC",
+    "RANKING_REQUEST_V1_SCHEMA_NAME",
+    "RANKING_RESPONSE_V1_SCHEMA_NAME",
     "RANKING_TOPICS",
+    "RULES_BASED_RANKING_STRATEGY",
+    "RankedContentItemV1Schema",
+    "RankingCandidateV1Schema",
+    "RankingDecisionEventV1Schema",
+    "RankingRequestV1Schema",
+    "RankingResponseV1Schema",
+    "RankingScoreBreakdownV1Schema",
     "TopicPreferencesSchema",
     "USER_TOPIC_AFFINITY_V1_SCHEMA_NAME",
     "UserTopicAffinityV1Schema",
