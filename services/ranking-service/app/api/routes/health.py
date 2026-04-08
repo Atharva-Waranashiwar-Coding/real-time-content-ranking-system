@@ -1,8 +1,8 @@
 """Health check endpoints for ranking-service."""
 
-from datetime import datetime
 from fastapi import APIRouter
-from shared_schemas import HealthCheckResponse
+
+from shared_schemas import HealthCheckResponse, utc_now
 
 router = APIRouter(tags=["health"])
 
@@ -13,7 +13,7 @@ async def health_check():
     return HealthCheckResponse(
         status="healthy",
         service="ranking-service",
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -23,5 +23,5 @@ async def readiness_check():
     return HealthCheckResponse(
         status="ready",
         service="ranking-service",
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
