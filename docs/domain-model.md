@@ -89,6 +89,55 @@
 │ created_at                         │
 │ published_at (nullable)            │
 └────────────────────────────────────┘
+
+
+┌────────────────────────────────────┐
+│  content_feature_snapshots         │
+├────────────────────────────────────┤
+│ id (PK)                            │
+│ schema_name                        │
+│ content_id                         │
+│ topic                              │
+│ window_hours                       │
+│ impressions                        │
+│ clicks                             │
+│ likes                              │
+│ saves                              │
+│ skip_count                         │
+│ watch_starts                       │
+│ watch_completes                    │
+│ ctr                                │
+│ like_rate                          │
+│ save_rate                          │
+│ skip_rate                          │
+│ completion_rate                    │
+│ trending_score                     │
+│ last_event_at                      │
+│ snapshot_at                        │
+│ created_at                         │
+└────────────────────────────────────┘
+
+
+┌────────────────────────────────────┐
+│  user_topic_feature_snapshots      │
+├────────────────────────────────────┤
+│ id (PK)                            │
+│ schema_name                        │
+│ user_id                            │
+│ topic                              │
+│ window_hours                       │
+│ impressions                        │
+│ clicks                             │
+│ likes                              │
+│ saves                              │
+│ skip_count                         │
+│ watch_starts                       │
+│ watch_completes                    │
+│ affinity_score                     │
+│ last_event_at                      │
+│ snapshot_at                        │
+│ created_at                         │
+└────────────────────────────────────┘
 ```
 
 ## Core Entities
@@ -245,6 +294,53 @@ Immutable interaction audit record created by `interaction-service`.
 - published_at
 
 ## Data Types and Constraints
+
+### ContentFeatureSnapshot
+
+Append-only snapshot row created by `feature-processor` for a materialized content vector.
+
+**Fields:**
+- `id`: UUID (primary key)
+- `schema_name`: explicit schema identifier, currently `content_features.v1`
+- `content_id`: UUID of the content item
+- `topic`: optional topic slug carried from interaction events
+- `window_hours`: configured rolling window size
+- `impressions`, `clicks`, `likes`, `saves`, `skip_count`, `watch_starts`, `watch_completes`: rolling event counts
+- `ctr`, `like_rate`, `save_rate`, `skip_rate`, `completion_rate`: derived rates from the rolling counts
+- `trending_score`: deterministic recency-aware engagement score used by ranking consumers
+- `last_event_at`: most recent event timestamp contributing to the vector
+- `snapshot_at`: time the vector was persisted to PostgreSQL
+- `created_at`: row creation timestamp
+
+**Indexes:**
+- schema_name
+- content_id
+- topic
+- snapshot_at
+- created_at
+
+### UserTopicFeatureSnapshot
+
+Append-only snapshot row created by `feature-processor` for a user-topic affinity vector entry.
+
+**Fields:**
+- `id`: UUID (primary key)
+- `schema_name`: explicit schema identifier, currently `user_topic_affinity.v1`
+- `user_id`: UUID of the user
+- `topic`: normalized topic slug
+- `window_hours`: configured rolling window size
+- `impressions`, `clicks`, `likes`, `saves`, `skip_count`, `watch_starts`, `watch_completes`: rolling user-topic interaction counts
+- `affinity_score`: weighted topic affinity signal for ranking
+- `last_event_at`: most recent event timestamp contributing to the vector
+- `snapshot_at`: time the vector was persisted to PostgreSQL
+- `created_at`: row creation timestamp
+
+**Indexes:**
+- schema_name
+- user_id
+- topic
+- snapshot_at
+- created_at
 
 ### Shared Constraints
 
