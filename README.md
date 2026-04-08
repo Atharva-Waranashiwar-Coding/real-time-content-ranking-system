@@ -84,6 +84,7 @@ Observability:  Prometheus | Grafana | Structured Logs
 - **Kafka** – Event streaming with Zookeeper for coordination
 - **Prometheus** – Metrics collection
 - **Grafana** – Metrics visualization and dashboards
+- **Runbooks** – Local monitoring and debugging workflows
 
 ## Tech Stack
 
@@ -183,15 +184,15 @@ real-time-content-ranking-system/
 ├── packages/
 │   ├── shared-schemas/               # Common Pydantic models
 │   ├── shared-config/                # Configuration utilities
-│   ├── shared-logging/               # Logging infrastructure
+│   ├── shared-logging/               # Logging and observability helpers
 │   └── shared-clients/               # HTTP/Kafka clients
 ├── infra/
-│   ├── docker/                       # Docker Compose, init scripts
-│   ├── grafana/                      # Grafana dashboards
-│   └── prometheus/                   # Prometheus configuration
+│   └── docker/                       # Docker Compose, Prometheus, Grafana, dashboards
 ├── docs/
 │   ├── architecture-overview.md      # System design
+│   ├── observability.md              # Telemetry and dashboard inventory
 │   ├── repository-standards.md       # Code standards
+│   ├── runbooks/                     # Local monitoring and debugging workflows
 │   └── adr/                          # Architecture decision records
 ├── scripts/
 │   ├── lint.sh                       # Linting automation
@@ -251,6 +252,8 @@ Hooks include black, ruff, end-of-file-fixer, and trailing-whitespace.
 - **Phase 8:** Demo readiness and polish
 
 See [real_time_content_ranking_system_plan.md](real_time_content_ranking_system_plan.md) for detailed phase specifications.
+See [docs/observability.md](docs/observability.md) for telemetry and dashboard details.
+See [docs/runbooks/local-monitoring.md](docs/runbooks/local-monitoring.md) and [docs/runbooks/debugging.md](docs/runbooks/debugging.md) for local operations.
 
 ## Key Concepts
 

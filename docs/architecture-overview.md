@@ -191,10 +191,19 @@ All services export Prometheus metrics at `/metrics` endpoint. Key metrics inclu
 - Event throughput
 - Feature computation time
 - Redis cache hit rates
+- Consumer lag for `feature-processor` when Kafka offset metadata is available
+- Ranking latency by strategy and feed assembly latency by cache path
 
 ### Logging
 
 Structured JSON logging with correlation IDs enables distributed tracing.
+
+### Correlation Flow
+
+- Incoming HTTP requests generate or reuse `X-Request-ID` and `X-Correlation-ID`
+- Feed-service forwards those IDs into upstream HTTP dependencies
+- Interaction and ranking events preserve them in Kafka headers
+- Feature-processor and dead-letter publications log and emit the same identifiers for replay/debugging
 
 ### Grafana Dashboards
 
@@ -211,10 +220,14 @@ Structured JSON logging with correlation IDs enables distributed tracing.
 - Kafka auto-creates topics with replication
 - Redis persistence enabled
 
+### Current Operational Safeguards
+
+- HTTP and Kafka publish retries with bounded exponential backoff
+- Dead letter topic `interactions.events.dlq.v1` for invalid or repeatedly failing interaction processing
+- `/api/v1/live` and `/api/v1/ready` endpoints across services with dependency-aware readiness where practical
+
 ### Future Phases
 
-- Retry and backoff strategies
-- Dead letter topic for failed events
 - Circuit breakers for inter-service calls
 - Graceful degradation
 
