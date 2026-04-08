@@ -1,7 +1,9 @@
 """Health check endpoints for interaction-service."""
 
 from datetime import datetime
+
 from fastapi import APIRouter
+
 from shared_schemas import HealthCheckResponse
 
 router = APIRouter(tags=["health"])
