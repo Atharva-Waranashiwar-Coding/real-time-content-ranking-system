@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
 
 
 class InteractionEventType(str, Enum):
@@ -39,7 +40,15 @@ class ContentStatus(str, Enum):
     PUBLISHED = "published"
 
 
+INTERACTION_EVENT_V1_SCHEMA_NAME = "interaction_event.v1"
+INTERACTIONS_EVENTS_V1_TOPIC = "interactions.events.v1"
 RANKING_TOPICS = tuple(category.value for category in ContentCategory)
+
+
+def utc_now() -> datetime:
+    """Return the current UTC timestamp."""
+
+    return datetime.now(timezone.utc)
 
 
 def normalize_topic_preferences(
@@ -187,20 +196,98 @@ class ContentMetadataSchema(BaseModel):
         return normalized
 
 
-class InteractionEventSchema(BaseModel):
-    """Event schema for user interactions."""
+class InteractionEventV1Schema(BaseModel):
+    """Versioned interaction event schema used for ingestion and publishing."""
 
-    event_id: str = Field(..., description="Unique event identifier")
+    schema_name: str = Field(
+        default=INTERACTION_EVENT_V1_SCHEMA_NAME,
+        description="Explicit schema identifier for versioned event consumers",
+    )
+    event_id: UUID = Field(..., description="Unique event identifier")
     event_type: InteractionEventType
-    user_id: str
-    content_id: str | None = None
-    session_id: str | None = None
-    topic: str | None = None
-    watch_duration_seconds: int = 0
-    event_timestamp: datetime
+    user_id: UUID
+    content_id: UUID
+    session_id: str | None = Field(default=None, max_length=255)
+    topic: str | None = Field(default=None, max_length=100)
+    watch_duration_seconds: int = Field(default=0, ge=0, le=86400)
+    event_timestamp: datetime = Field(default_factory=utc_now)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        """Keep the schema identifier explicit and versioned."""
+
+        if value != INTERACTION_EVENT_V1_SCHEMA_NAME:
+            raise ValueError(
+                f"schema_name must be '{INTERACTION_EVENT_V1_SCHEMA_NAME}'"
+            )
+        return value
+
+    @field_validator("session_id", mode="before")
+    @classmethod
+    def normalize_session_id(cls, value: str | None) -> str | None:
+        """Normalize optional session identifiers."""
+
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("topic", mode="before")
+    @classmethod
+    def normalize_topic(cls, value: str | None) -> str | None:
+        """Normalize optional topic slugs."""
+
+        if value is None:
+            return None
+
+        normalized = value.strip().lower()
+        return normalized or None
+
+    @field_validator("event_timestamp")
+    @classmethod
+    def ensure_timezone_aware_timestamp(cls, value: datetime) -> datetime:
+        """Coerce naive timestamps to UTC for consistent event storage."""
+
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    @model_validator(mode="after")
+    def validate_watch_event_fields(self) -> InteractionEventV1Schema:
+        """Validate watch-event specific constraints."""
+
+        if (
+            self.event_type == InteractionEventType.WATCH_COMPLETE
+            and self.watch_duration_seconds <= 0
+        ):
+            raise ValueError(
+                "watch_duration_seconds must be greater than 0 for watch_complete events"
+            )
+        return self
+
+
+class InteractionEventSchema(InteractionEventV1Schema):
+    """Backward-compatible alias for the current interaction event schema."""
+
+
+class InteractionAcceptedResponse(BaseModel):
+    """Response returned after an interaction has been accepted for processing."""
+
+    event_id: UUID
+    schema_name: str = INTERACTION_EVENT_V1_SCHEMA_NAME
+    kafka_topic: str = INTERACTIONS_EVENTS_V1_TOPIC
+    status: str = "accepted"
+    request_id: str
+    correlation_id: str
+    received_at: datetime
+    published_at: datetime | None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class HealthCheckResponse(BaseModel):
@@ -237,6 +324,10 @@ __all__ = [
     "ContentTagSchema",
     "ErrorResponse",
     "HealthCheckResponse",
+    "INTERACTION_EVENT_V1_SCHEMA_NAME",
+    "INTERACTIONS_EVENTS_V1_TOPIC",
+    "InteractionAcceptedResponse",
+    "InteractionEventV1Schema",
     "InteractionEventSchema",
     "InteractionEventType",
     "PaginationParams",
@@ -245,4 +336,5 @@ __all__ = [
     "UserProfileBaseSchema",
     "UserSummarySchema",
     "normalize_topic_preferences",
+    "utc_now",
 ]
