@@ -78,7 +78,7 @@ class TestRankingEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["strategy_name"] == "rules_based.v1"
+        assert data["strategy_name"] == "rules_v1"
         assert data["candidate_count"] == 2
         assert len(data["ranked_items"]) == 2
         assert data["ranked_items"][0]["score"] >= data["ranked_items"][1]["score"]
@@ -119,3 +119,31 @@ class TestRankingEndpoints:
         data = response.json()
         assert data["candidate_count"] == 0
         assert data["ranked_items"] == []
+
+    def test_rankings_supports_trending_boost_strategy(self, client):
+        """The service should accept the alternate trending-boost strategy."""
+
+        payload = {
+            "user_id": str(uuid4()),
+            "strategy_name": "rules_v2_with_trending_boost",
+            "candidates": [
+                _build_candidate_payload(
+                    topic="backend",
+                    user_topic_affinity=0.65,
+                    trending_score=25.0,
+                ),
+                _build_candidate_payload(
+                    topic="ai",
+                    category="ai",
+                    user_topic_affinity=0.7,
+                    trending_score=2.0,
+                ),
+            ],
+        }
+
+        response = client.post("/api/v1/rankings", json=payload)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["strategy_name"] == "rules_v2_with_trending_boost"
+        assert data["ranked_items"][0]["score_breakdown"]["strategy_adjustment"] > 0

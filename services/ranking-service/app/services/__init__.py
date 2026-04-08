@@ -10,6 +10,7 @@ from app.services.scoring import (
     compute_diversity_penalty,
     compute_engagement_score,
     compute_recency_score,
+    get_strategy_definition,
     normalize_trending_score,
     rank_candidates,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "compute_diversity_penalty",
     "compute_engagement_score",
     "compute_recency_score",
+    "get_strategy_definition",
     "normalize_trending_score",
     "rank_candidates",
 ]

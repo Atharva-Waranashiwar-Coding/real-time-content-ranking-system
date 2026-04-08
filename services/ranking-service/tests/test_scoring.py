@@ -96,6 +96,7 @@ def test_rank_candidates_orders_by_composite_score():
 
     ranked_items = rank_candidates(
         [lower_signal, high_signal],
+        strategy_name="rules_v1",
         apply_diversity_penalty=False,
         now=utc_now(),
     )
@@ -128,6 +129,7 @@ def test_diversity_penalty_reorders_repeated_topics():
 
     ranked_items = rank_candidates(
         [first_backend, second_backend, ai_candidate],
+        strategy_name="rules_v1",
         apply_diversity_penalty=True,
         now=utc_now(),
     )
@@ -136,3 +138,44 @@ def test_diversity_penalty_reorders_repeated_topics():
     assert ranked_items[1].topic == "ai"
     assert ranked_items[2].score_breakdown.diversity_penalty > 0
     assert compute_diversity_penalty(second_backend, [ranked_items[0]]) > 0
+
+
+def test_trending_boost_strategy_can_change_ordering():
+    """High-trending content should benefit from the v2 strategy adjustment."""
+
+    trending_candidate = _build_candidate(
+        topic="backend",
+        category="backend",
+        user_topic_affinity=0.48,
+        ctr=0.2,
+        like_rate=0.12,
+        save_rate=0.08,
+        completion_rate=0.2,
+        trending_score=15.0,
+    )
+    affinity_candidate = _build_candidate(
+        topic="ai",
+        category="ai",
+        user_topic_affinity=0.68,
+        ctr=0.2,
+        like_rate=0.12,
+        save_rate=0.08,
+        completion_rate=0.2,
+        trending_score=1.0,
+    )
+
+    ranked_v1 = rank_candidates(
+        [affinity_candidate, trending_candidate],
+        strategy_name="rules_v1",
+        apply_diversity_penalty=False,
+        now=utc_now(),
+    )
+    ranked_v2 = rank_candidates(
+        [affinity_candidate, trending_candidate],
+        strategy_name="rules_v2_with_trending_boost",
+        apply_diversity_penalty=False,
+        now=utc_now(),
+    )
+
+    assert ranked_v1[0].content_id == affinity_candidate.content_id
+    assert ranked_v2[0].content_id == trending_candidate.content_id

@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from app.core.config import config
+from app.services.strategies import StrategyDefinition, get_strategy_definition
 
 from shared_schemas import (
+    RULES_V1_RANKING_STRATEGY,
     RankedContentItemV1Schema,
     RankingCandidateV1Schema,
     RankingScoreBreakdownV1Schema,
@@ -80,6 +82,7 @@ def normalize_trending_score(raw_trending_score: float) -> float:
 
 def compute_base_breakdown(
     candidate: RankingCandidateV1Schema,
+    strategy: StrategyDefinition,
     now: datetime | None = None,
 ) -> RankingScoreBreakdownV1Schema:
     """Compute non-diversity components for a candidate."""
@@ -88,14 +91,15 @@ def compute_base_breakdown(
     recency = compute_recency_score(candidate.published_at, now)
     engagement = compute_engagement_score(candidate)
     trending = normalize_trending_score(candidate.content_features.trending_score)
+    strategy_adjustment = strategy.compute_strategy_adjustment(trending)
 
     user_topic_affinity_weighted = round(
-        user_topic_affinity * config.USER_TOPIC_AFFINITY_WEIGHT,
+        user_topic_affinity * strategy.user_topic_affinity_weight,
         6,
     )
-    recency_weighted = round(recency * config.RECENCY_WEIGHT, 6)
-    engagement_weighted = round(engagement * config.ENGAGEMENT_WEIGHT, 6)
-    trending_weighted = round(trending * config.TRENDING_WEIGHT, 6)
+    recency_weighted = round(recency * strategy.recency_weight, 6)
+    engagement_weighted = round(engagement * strategy.engagement_weight, 6)
+    trending_weighted = round(trending * strategy.trending_weight, 6)
     final_score = round(
         user_topic_affinity_weighted
         + recency_weighted
@@ -103,6 +107,7 @@ def compute_base_breakdown(
         + trending_weighted,
         6,
     )
+    final_score = round(final_score + strategy_adjustment, 6)
 
     return RankingScoreBreakdownV1Schema(
         user_topic_affinity=user_topic_affinity,
@@ -113,6 +118,7 @@ def compute_base_breakdown(
         engagement_weighted=engagement_weighted,
         trending=trending,
         trending_weighted=trending_weighted,
+        strategy_adjustment=strategy_adjustment,
         diversity_penalty=0.0,
         final_score=final_score,
     )
@@ -139,15 +145,17 @@ def compute_diversity_penalty(
 def rank_candidates(
     candidates: list[RankingCandidateV1Schema],
     *,
+    strategy_name: str = RULES_V1_RANKING_STRATEGY,
     apply_diversity_penalty: bool,
     now: datetime | None = None,
 ) -> list[RankedContentItemV1Schema]:
     """Rank candidate items with a greedy diversity-aware ordering pass."""
 
     scoring_time = now or utc_now()
+    strategy = get_strategy_definition(strategy_name)
     remaining_candidates: list[CandidateScoreState] = []
     for candidate in candidates:
-        breakdown = compute_base_breakdown(candidate, scoring_time)
+        breakdown = compute_base_breakdown(candidate, strategy, scoring_time)
         remaining_candidates.append(
             CandidateScoreState(
                 candidate=candidate,
@@ -206,6 +214,7 @@ __all__ = [
     "compute_diversity_penalty",
     "compute_engagement_score",
     "compute_recency_score",
+    "get_strategy_definition",
     "normalize_trending_score",
     "rank_candidates",
 ]

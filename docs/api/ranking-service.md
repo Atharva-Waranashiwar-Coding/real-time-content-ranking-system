@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:8005/api/v1`
 
-`ranking-service` is an internal scoring service used by `feed-service`. It ranks candidate content items with a deterministic rules-based formula and publishes ranking decision events to Kafka topic `ranking.decisions.v1`.
+`ranking-service` is an internal scoring service used by `feed-service`. It ranks candidate content items with deterministic, explicit strategy variants and publishes ranking decision events to Kafka topic `ranking.decisions.v1`.
 
 ## Endpoint
 
@@ -13,7 +13,7 @@ Rank a batch of candidates for a user.
 ```json
 {
   "schema_name": "ranking_request.v1",
-  "strategy_name": "rules_based.v1",
+  "strategy_name": "rules_v1",
   "user_id": "5f1a550d-0191-43c2-b25d-a7c5e2daa001",
   "apply_diversity_penalty": true,
   "metadata": {
@@ -63,7 +63,7 @@ Returns `200 OK`:
 {
   "schema_name": "ranking_response.v1",
   "decision_id": "8db62169-ff6d-4f53-9a88-4fb6f033303c",
-  "strategy_name": "rules_based.v1",
+  "strategy_name": "rules_v1",
   "user_id": "5f1a550d-0191-43c2-b25d-a7c5e2daa001",
   "candidate_count": 1,
   "generated_at": "2026-04-08T12:00:01Z",
@@ -127,12 +127,23 @@ Inputs used by the rules-based scorer:
 - normalized `trending_score`
 - optional diversity penalty based on already selected topics/categories
 
-Current weighted formula:
+Supported strategies:
+
+- `rules_v1`
+- `rules_v2_with_trending_boost`
+
+`rules_v1` weighted formula:
 
 - user topic affinity: `0.35`
 - recency: `0.20`
 - engagement: `0.25`
 - trending: `0.20`
+
+`rules_v2_with_trending_boost` adjustments:
+
+- weights shift toward trending-sensitive scoring
+- a bounded `strategy_adjustment` is added for high normalized trending values
+- score breakdowns include this adjustment explicitly
 
 Diversity penalty is a post-score deduction:
 
@@ -146,6 +157,7 @@ Each ranked item returns:
 
 - normalized input scores
 - weighted component contributions
+- `strategy_adjustment` when the strategy applies a bounded boost
 - applied diversity penalty
 - final score
 

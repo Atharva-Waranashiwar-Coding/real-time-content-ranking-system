@@ -40,6 +40,7 @@ class RankingService:
         decision_id = uuid4()
         ranked_items = rank_candidates(
             request.candidates,
+            strategy_name=request.strategy_name,
             apply_diversity_penalty=request.apply_diversity_penalty,
             now=generated_at,
         )
