@@ -19,6 +19,10 @@ class ServiceConfig:
     USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user-service:8001")
     CONTENT_SERVICE_URL = os.getenv("CONTENT_SERVICE_URL", "http://content-service:8002")
     RANKING_SERVICE_URL = os.getenv("RANKING_SERVICE_URL", "http://ranking-service:8005")
+    EXPERIMENTATION_SERVICE_URL = os.getenv(
+        "EXPERIMENTATION_SERVICE_URL",
+        "http://experimentation-service:8006",
+    )
     REQUEST_ID_HEADER = "X-Request-ID"
     CORRELATION_ID_HEADER = "X-Correlation-ID"
     FEED_CACHE_TTL_SECONDS = int(os.getenv("FEED_CACHE_TTL_SECONDS", "60"))

@@ -11,7 +11,13 @@ from app.schemas import (
 )
 
 from shared_clients import ServiceClient
-from shared_schemas import RankingRequestV1Schema, RankingResponseV1Schema
+from shared_schemas import (
+    ExperimentAssignmentV1Schema,
+    ExperimentExposureCreateV1Schema,
+    ExperimentExposureV1Schema,
+    RankingRequestV1Schema,
+    RankingResponseV1Schema,
+)
 
 
 class UserContextClientProtocol(Protocol):
@@ -43,6 +49,26 @@ class RankingApiClientProtocol(Protocol):
         headers: dict[str, str],
     ) -> RankingResponseV1Schema:
         """Return ranked candidate content."""
+
+
+class ExperimentationApiClientProtocol(Protocol):
+    """Protocol for deterministic experiment assignment and exposure logging."""
+
+    async def get_assignment(
+        self,
+        user_id: str,
+        *,
+        headers: dict[str, str],
+    ) -> ExperimentAssignmentV1Schema:
+        """Return the active experiment assignment for the user."""
+
+    async def record_exposure(
+        self,
+        exposure_request: ExperimentExposureCreateV1Schema,
+        *,
+        headers: dict[str, str],
+    ) -> ExperimentExposureV1Schema:
+        """Persist an experiment exposure for the feed response."""
 
 
 class UserContextClient:
@@ -109,9 +135,51 @@ class RankingApiClient:
             return RankingResponseV1Schema.model_validate(response.json())
 
 
+class ExperimentationApiClient:
+    """HTTP client for experimentation-service."""
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+
+    async def get_assignment(
+        self,
+        user_id: str,
+        *,
+        headers: dict[str, str],
+    ) -> ExperimentAssignmentV1Schema:
+        """Fetch the deterministic experiment assignment for a user."""
+
+        async with ServiceClient(self.base_url) as client:
+            response = await client.get(
+                f"/api/v1/experiments/assignment?user_id={user_id}",
+                headers=headers,
+            )
+            response.raise_for_status()
+            return ExperimentAssignmentV1Schema.model_validate(response.json())
+
+    async def record_exposure(
+        self,
+        exposure_request: ExperimentExposureCreateV1Schema,
+        *,
+        headers: dict[str, str],
+    ) -> ExperimentExposureV1Schema:
+        """Persist a feed exposure for the user's assigned experiment variant."""
+
+        async with ServiceClient(self.base_url) as client:
+            response = await client.post(
+                "/api/v1/experiments/exposures",
+                json=exposure_request.model_dump(mode="json"),
+                headers=headers,
+            )
+            response.raise_for_status()
+            return ExperimentExposureV1Schema.model_validate(response.json())
+
+
 __all__ = [
     "ContentCatalogClient",
     "ContentCatalogClientProtocol",
+    "ExperimentationApiClient",
+    "ExperimentationApiClientProtocol",
     "RankingApiClient",
     "RankingApiClientProtocol",
     "UserContextClient",

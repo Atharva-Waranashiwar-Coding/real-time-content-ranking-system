@@ -5,6 +5,7 @@ from app.services.feature_store import FeedRedisStore
 from app.services.feed_service import FeedAssemblyError, FeedService
 from app.services.upstream_clients import (
     ContentCatalogClient,
+    ExperimentationApiClient,
     RankingApiClient,
     UserContextClient,
 )
@@ -12,6 +13,7 @@ from app.services.upstream_clients import (
 __all__ = [
     "CandidateService",
     "ContentCatalogClient",
+    "ExperimentationApiClient",
     "FeedAssemblyError",
     "FeedRedisStore",
     "FeedService",

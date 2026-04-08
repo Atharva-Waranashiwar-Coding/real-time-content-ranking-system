@@ -50,6 +50,10 @@ class TestFeedEndpoint:
         assert data["cache_hit"] is False
         assert data["total_candidates"] >= 3
         assert client.ranking_client.calls == 1
+        assert data["experiment_assignment"]["strategy_name"] == "rules_v1"
+        assert client.ranking_client.last_request.strategy_name == "rules_v1"
+        assert client.experimentation_client.exposure_calls == 1
+        assert data["exposure_id"] is not None
 
         candidate_sources = {
             str(candidate.content_id): set(candidate.candidate_sources)
@@ -80,6 +84,7 @@ class TestFeedEndpoint:
         assert response_one.json()["cache_hit"] is False
         assert response_two.json()["cache_hit"] is True
         assert client.ranking_client.calls == 1
+        assert client.experimentation_client.exposure_calls == 2
 
     def test_get_feed_paginates_ranked_results(self, client):
         """Feed pagination should slice the ranked result set correctly."""
@@ -95,6 +100,7 @@ class TestFeedEndpoint:
         assert len(data["items"]) == 1
         assert data["has_more"] is True
         assert data["items"][0]["rank"] == 2
+        assert client.experimentation_client.last_exposure_request.feed_offset == 1
 
     def test_get_feed_returns_empty_result_when_no_candidates(self, client):
         """Empty candidate sets should not call ranking-service."""
@@ -109,3 +115,4 @@ class TestFeedEndpoint:
         data = response.json()
         assert data["items"] == []
         assert data["total_candidates"] == 0
+        assert client.experimentation_client.exposure_calls == 1

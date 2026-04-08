@@ -11,6 +11,7 @@ Base URL: `http://localhost:8004/api/v1`
 Query params:
 
 - `user_id`: required UUID
+- `session_id`: optional browser or device session identifier used for experiment exposure logging
 - `limit`: optional, default `20`, max `100`
 - `offset`: optional, default `0`
 
@@ -76,9 +77,33 @@ Returns `200 OK`:
   "offset": 0,
   "has_more": true,
   "cache_hit": false,
+  "experiment_assignment": {
+    "schema_name": "experiment_assignment.v1",
+    "experiment_key": "home_feed_ranking.v1",
+    "variant_key": "control",
+    "strategy_name": "rules_v1",
+    "user_id": "5f1a550d-0191-43c2-b25d-a7c5e2daa001",
+    "assignment_bucket": 1234,
+    "assigned_at": "2026-04-08T11:59:00Z"
+  },
+  "exposure_id": "6cbf35a8-d48a-4f2f-a1b4-92d6ac8425c9",
   "generated_at": "2026-04-08T12:00:01Z"
 }
 ```
+
+## Experiment Flow
+
+Before ranking:
+
+- feed-service calls `experimentation-service` for a deterministic user assignment
+- the assigned variant resolves the ranking `strategy_name`
+- Redis feed cache keys are scoped by `{user_id, experiment_key, variant_key, limit, offset}`
+
+After the response is assembled:
+
+- feed-service persists a new experiment exposure row
+- item-level exposure rows are written for each returned content item
+- cached responses still create new exposure rows because they were still shown to the user
 
 ## Candidate Retrieval
 
@@ -122,7 +147,7 @@ This keeps page boundaries consistent with the global ranked order.
 
 Redis page cache key:
 
-- `feed:user:{user_id}:limit:{limit}:offset:{offset}:v1`
+- `feed:user:{user_id}:experiment:{experiment_key}:variant:{variant_key}:limit:{limit}:offset:{offset}:v1`
 
 Behavior:
 

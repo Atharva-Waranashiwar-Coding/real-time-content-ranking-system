@@ -6,6 +6,7 @@ import importlib.util
 import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -52,6 +53,8 @@ from app.services import (  # noqa: E402
 )
 
 from shared_schemas import (  # noqa: E402
+    ExperimentAssignmentV1Schema,
+    ExperimentExposureV1Schema,
     RankedContentItemV1Schema,
     RankingResponseV1Schema,
     RankingScoreBreakdownV1Schema,
@@ -179,9 +182,46 @@ class FakeRankingApiClient:
         return RankingResponseV1Schema(
             decision_id="1f57d1ba-c6fd-4682-a243-6c5cc72dc5ff",
             user_id=ranking_request.user_id,
+            strategy_name=ranking_request.strategy_name,
             candidate_count=len(ranking_request.candidates),
             ranked_items=ranked_items,
             generated_at=utc_now(),
+        )
+
+
+class FakeExperimentationApiClient:
+    """Fake experimentation-service client."""
+
+    def __init__(self):
+        self.assignment_calls = 0
+        self.exposure_calls = 0
+        self.last_headers = None
+        self.last_exposure_request = None
+        self.assignment = ExperimentAssignmentV1Schema(
+            experiment_key="home_feed_ranking.v1",
+            variant_key="control",
+            strategy_name="rules_v1",
+            user_id="5f1a550d-0191-43c2-b25d-a7c5e2daa001",
+            assignment_bucket=1234,
+            assigned_at=utc_now(),
+        )
+
+    async def get_assignment(self, user_id: str, *, headers: dict[str, str]):
+        self.assignment_calls += 1
+        self.last_headers = headers
+        return self.assignment
+
+    async def record_exposure(self, exposure_request, *, headers: dict[str, str]):
+        self.exposure_calls += 1
+        self.last_headers = headers
+        self.last_exposure_request = exposure_request
+        return ExperimentExposureV1Schema(
+            exposure_id=str(uuid4()),
+            experiment_key=exposure_request.experiment_key,
+            variant_key=exposure_request.variant_key,
+            strategy_name=exposure_request.strategy_name,
+            user_id=exposure_request.user_id,
+            recorded_at=utc_now(),
         )
 
 
@@ -260,6 +300,7 @@ def client_components(fake_redis):
     user_client = FakeUserContextClient(user_response)
     content_client = FakeContentCatalogClient(content_items)
     ranking_client = FakeRankingApiClient()
+    experimentation_client = FakeExperimentationApiClient()
 
     feature_store = FeedRedisStore(fake_redis)
     candidate_service = CandidateService(
@@ -270,6 +311,7 @@ def client_components(fake_redis):
     feed_service = FeedService(
         candidate_service=candidate_service,
         ranking_client=ranking_client,
+        experimentation_client=experimentation_client,
         feature_store=feature_store,
         cache_ttl_seconds=60,
     )
@@ -278,6 +320,7 @@ def client_components(fake_redis):
         "content_client": content_client,
         "feature_store": feature_store,
         "feed_service": feed_service,
+        "experimentation_client": experimentation_client,
         "ranking_client": ranking_client,
         "user_client": user_client,
         "user_response": user_response,
@@ -294,6 +337,7 @@ def client(fake_redis: InMemoryRedis, client_components) -> TestClient:
     with TestClient(app) as test_client:
         test_client.fake_redis = fake_redis
         test_client.feed_service = client_components["feed_service"]
+        test_client.experimentation_client = client_components["experimentation_client"]
         test_client.ranking_client = client_components["ranking_client"]
         test_client.content_client = client_components["content_client"]
         test_client.user_client = client_components["user_client"]

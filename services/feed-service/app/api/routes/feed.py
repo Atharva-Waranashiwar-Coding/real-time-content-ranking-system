@@ -17,6 +17,7 @@ def get_feed_service(request: Request) -> FeedService:
 @router.get("/feed", response_model=FeedResponse)
 async def get_feed(
     user_id: str = Query(..., description="User identifier"),
+    session_id: str | None = Query(None, description="Optional browser session identifier"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     request_context: RequestContext = Depends(get_request_context),
@@ -24,7 +25,12 @@ async def get_feed(
 ) -> FeedResponse:
     """Return a paginated personalized feed."""
 
-    query_params = FeedQueryParams(user_id=user_id, limit=limit, offset=offset)
+    query_params = FeedQueryParams(
+        user_id=user_id,
+        session_id=session_id,
+        limit=limit,
+        offset=offset,
+    )
     try:
         return await feed_service.get_feed(query_params, request_context)
     except FeedAssemblyError as exc:

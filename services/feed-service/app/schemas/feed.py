@@ -21,10 +21,22 @@ class FeedQueryParams(BaseModel):
     """Query parameters accepted by the feed endpoint."""
 
     user_id: UUID
+    session_id: str | None = None
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("session_id", mode="before")
+    @classmethod
+    def normalize_session_id(cls, value: str | None) -> str | None:
+        """Normalize optional session identifiers."""
+
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        return normalized or None
 
 
 class UpstreamUserProfile(UserProfileBaseSchema):

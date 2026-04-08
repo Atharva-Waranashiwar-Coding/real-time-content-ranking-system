@@ -7,6 +7,7 @@ from app.core import build_request_context, config
 from app.services import (
     CandidateService,
     ContentCatalogClient,
+    ExperimentationApiClient,
     FeedRedisStore,
     FeedService,
     RankingApiClient,
@@ -32,6 +33,9 @@ def _build_feed_service(app: FastAPI) -> FeedService:
     return FeedService(
         candidate_service=candidate_service,
         ranking_client=RankingApiClient(config.RANKING_SERVICE_URL),
+        experimentation_client=ExperimentationApiClient(
+            config.EXPERIMENTATION_SERVICE_URL
+        ),
         feature_store=feature_store,
         cache_ttl_seconds=config.FEED_CACHE_TTL_SECONDS,
     )

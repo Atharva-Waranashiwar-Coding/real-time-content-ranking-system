@@ -52,10 +52,19 @@ class FeedRedisStore:
         return f"feature:user:{user_id}:topic-affinity:v1"
 
     @staticmethod
-    def feed_cache_key(user_id: str, limit: int, offset: int) -> str:
+    def feed_cache_key(
+        user_id: str,
+        experiment_key: str,
+        variant_key: str,
+        limit: int,
+        offset: int,
+    ) -> str:
         """Return the Redis cache key for a paginated feed response."""
 
-        return f"feed:user:{user_id}:limit:{limit}:offset:{offset}:v1"
+        return (
+            f"feed:user:{user_id}:experiment:{experiment_key}:variant:{variant_key}:"
+            f"limit:{limit}:offset:{offset}:v1"
+        )
 
     async def ping(self) -> bool:
         """Check Redis availability."""
@@ -110,12 +119,16 @@ class FeedRedisStore:
     async def get_cached_feed(
         self,
         user_id: str,
+        experiment_key: str,
+        variant_key: str,
         limit: int,
         offset: int,
     ) -> dict | None:
         """Return a cached feed payload if one exists."""
 
-        raw_payload = await self.redis.get(self.feed_cache_key(user_id, limit, offset))
+        raw_payload = await self.redis.get(
+            self.feed_cache_key(user_id, experiment_key, variant_key, limit, offset)
+        )
         if raw_payload is None:
             return None
         return json.loads(raw_payload)
@@ -123,6 +136,8 @@ class FeedRedisStore:
     async def set_cached_feed(
         self,
         user_id: str,
+        experiment_key: str,
+        variant_key: str,
         limit: int,
         offset: int,
         payload: dict,
@@ -131,7 +146,7 @@ class FeedRedisStore:
         """Cache a paginated feed response."""
 
         await self.redis.set(
-            self.feed_cache_key(user_id, limit, offset),
+            self.feed_cache_key(user_id, experiment_key, variant_key, limit, offset),
             json.dumps(payload, separators=(",", ":"), sort_keys=True),
             ex=ttl_seconds,
         )
