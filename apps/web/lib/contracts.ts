@@ -10,7 +10,14 @@ export const INTERACTION_EVENT_TYPES = [
   "watch_complete",
 ] as const;
 
-export const SERVICE_KEYS = ["feed", "user", "content", "interaction"] as const;
+export const SERVICE_KEYS = [
+  "feed",
+  "user",
+  "content",
+  "interaction",
+  "experimentation",
+  "analytics",
+] as const;
 
 export type TopicSlug = (typeof TOPIC_ORDER)[number];
 export type InteractionEventType = (typeof INTERACTION_EVENT_TYPES)[number];
@@ -105,6 +112,7 @@ export interface RankingScoreBreakdownResponse {
   engagement_weighted: number;
   trending: number;
   trending_weighted: number;
+  strategy_adjustment: number;
   diversity_penalty: number;
   final_score: number;
 }
@@ -133,6 +141,40 @@ export interface FeedResponse {
   offset: number;
   has_more: boolean;
   cache_hit: boolean;
+  experiment_assignment: ExperimentAssignmentResponse | null;
+  exposure_id: string | null;
+  generated_at: string;
+}
+
+export interface ExperimentAssignmentResponse {
+  schema_name: "experiment_assignment.v1";
+  experiment_key: string;
+  variant_key: string;
+  strategy_name: "rules_v1" | "rules_v2_with_trending_boost";
+  user_id: string;
+  assignment_bucket: number;
+  assigned_at: string;
+}
+
+export interface StrategyOutcomeMetricsResponse {
+  variant_key: string;
+  strategy_name: "rules_v1" | "rules_v2_with_trending_boost";
+  exposure_requests: number;
+  item_exposures: number;
+  unique_users: number;
+  clicks: number;
+  saves: number;
+  completions: number;
+  ctr: number;
+  save_rate: number;
+  completion_rate: number;
+}
+
+export interface ExperimentComparisonResponse {
+  schema_name: "experiment_comparison.v1";
+  experiment_key: string;
+  lookback_hours: number;
+  strategies: StrategyOutcomeMetricsResponse[];
   generated_at: string;
 }
 

@@ -1,4 +1,5 @@
 import type {
+  ExperimentAssignmentResponse,
   FeedItemResponse,
   InteractionEventRequest,
   InteractionEventType,
@@ -25,12 +26,16 @@ export function buildInteractionRequest({
   sessionId,
   item,
   surface,
+  experimentAssignment,
+  feedExposureId,
 }: {
   eventType: InteractionEventType;
   userId: string;
   sessionId: string;
   item: FeedItemResponse;
   surface: string;
+  experimentAssignment?: ExperimentAssignmentResponse | null;
+  feedExposureId?: string | null;
 }): InteractionEventRequest {
   return {
     schema_name: "interaction_event.v1",
@@ -47,6 +52,10 @@ export function buildInteractionRequest({
       rank: item.rank,
       category: item.category,
       score: Number(item.score.toFixed(6)),
+      experiment_key: experimentAssignment?.experiment_key ?? null,
+      variant_key: experimentAssignment?.variant_key ?? null,
+      strategy_name: experimentAssignment?.strategy_name ?? null,
+      feed_exposure_id: feedExposureId ?? null,
     },
   };
 }

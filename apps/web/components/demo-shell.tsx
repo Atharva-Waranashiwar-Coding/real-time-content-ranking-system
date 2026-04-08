@@ -6,7 +6,7 @@ import type { ServiceHealthState, UserResponse } from "../lib/contracts";
 import { formatRelativeTime } from "../lib/format";
 
 type DemoShellProps = {
-  activePath: "/" | "/feed" | "/insights";
+  activePath: "/" | "/feed" | "/insights" | "/experiments";
   eyebrow: string;
   title: string;
   description: string;
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Overview" },
   { href: "/feed", label: "Feed" },
   { href: "/insights", label: "Insights" },
+  { href: "/experiments", label: "Experiments" },
 ] as const;
 
 function UserSwitcher({

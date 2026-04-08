@@ -88,6 +88,7 @@ const FeedPage = () => {
     error: feedError,
   } = useFeedResponse({
     userId: selectedUserId,
+    sessionId,
     limit: FEED_PAGE_LIMIT,
     offset,
   });
@@ -130,6 +131,8 @@ const FeedPage = () => {
       sessionId,
       surface: "web.feed.v1",
       userId: selectedUserId,
+      experimentAssignment: feed?.experiment_assignment,
+      feedExposureId: feed?.exposure_id,
     });
     const pendingEvent = buildPendingSessionEvent({ payload, item });
 
@@ -232,6 +235,25 @@ const FeedPage = () => {
                   detail={`Page size ${FEED_PAGE_LIMIT}`}
                 />
               </div>
+              {feed?.experiment_assignment ? (
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <RuntimeTile
+                    label="Experiment"
+                    value={feed.experiment_assignment.experiment_key}
+                    detail="Active experiment used for this feed request"
+                  />
+                  <RuntimeTile
+                    label="Variant"
+                    value={feed.experiment_assignment.variant_key}
+                    detail={`Strategy ${feed.experiment_assignment.strategy_name}`}
+                  />
+                  <RuntimeTile
+                    label="Exposure"
+                    value={feed.exposure_id ?? "Pending"}
+                    detail="Exposure row recorded for this delivered feed page"
+                  />
+                </div>
+              ) : null}
             </SurfaceCard>
 
             {usersError ? (

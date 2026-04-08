@@ -1,5 +1,7 @@
 import type {
   ContentListResponse,
+  ExperimentAssignmentResponse,
+  ExperimentComparisonResponse,
   FeedResponse,
   HealthCheckResponse,
   InteractionAcceptedResponse,
@@ -24,6 +26,9 @@ const DEFAULT_SERVICE_URLS = {
   user: process.env.NEXT_PUBLIC_USER_SERVICE_URL ?? "http://localhost:8001",
   content: process.env.NEXT_PUBLIC_CONTENT_SERVICE_URL ?? "http://localhost:8002",
   interaction: process.env.NEXT_PUBLIC_INTERACTION_SERVICE_URL ?? "http://localhost:8003",
+  experimentation:
+    process.env.NEXT_PUBLIC_EXPERIMENTATION_SERVICE_URL ?? "http://localhost:8006",
+  analytics: process.env.NEXT_PUBLIC_ANALYTICS_SERVICE_URL ?? "http://localhost:8007",
 };
 
 export const serviceDefinitions: ServiceDefinition[] = [
@@ -34,6 +39,16 @@ export const serviceDefinitions: ServiceDefinition[] = [
     key: "interaction",
     label: "Interaction",
     baseUrl: DEFAULT_SERVICE_URLS.interaction,
+  },
+  {
+    key: "experimentation",
+    label: "Experimentation",
+    baseUrl: DEFAULT_SERVICE_URLS.experimentation,
+  },
+  {
+    key: "analytics",
+    label: "Analytics",
+    baseUrl: DEFAULT_SERVICE_URLS.analytics,
   },
 ];
 
@@ -123,10 +138,12 @@ export const userApi = {
 export const feedApi = {
   getFeed({
     userId,
+    sessionId,
     limit,
     offset,
   }: {
     userId: string;
+    sessionId?: string;
     limit: number;
     offset: number;
   }): Promise<FeedResponse> {
@@ -135,6 +152,9 @@ export const feedApi = {
       limit: String(limit),
       offset: String(offset),
     });
+    if (sessionId) {
+      params.set("session_id", sessionId);
+    }
     return requestJson<FeedResponse>("feed", `/api/v1/feed?${params.toString()}`);
   },
 };
@@ -154,6 +174,30 @@ export const interactionApi = {
       method: "POST",
       body: payload,
     });
+  },
+};
+
+export const experimentationApi = {
+  getAssignment(userId: string): Promise<ExperimentAssignmentResponse> {
+    return requestJson<ExperimentAssignmentResponse>(
+      "experimentation",
+      `/api/v1/experiments/assignment?user_id=${userId}`,
+    );
+  },
+};
+
+export const analyticsApi = {
+  getExperimentComparison({
+    experimentKey,
+    lookbackHours = 168,
+  }: {
+    experimentKey: string;
+    lookbackHours?: number;
+  }): Promise<ExperimentComparisonResponse> {
+    return requestJson<ExperimentComparisonResponse>(
+      "analytics",
+      `/api/v1/experiments/${experimentKey}/comparison?lookback_hours=${lookbackHours}`,
+    );
   },
 };
 

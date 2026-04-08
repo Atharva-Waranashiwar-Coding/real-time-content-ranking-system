@@ -1,7 +1,20 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 
-import { ApiError, contentApi, feedApi, userApi } from "./api";
-import type { ContentListResponse, FeedResponse, UserResponse } from "./contracts";
+import {
+  analyticsApi,
+  ApiError,
+  contentApi,
+  experimentationApi,
+  feedApi,
+  userApi,
+} from "./api";
+import type {
+  ContentListResponse,
+  ExperimentAssignmentResponse,
+  ExperimentComparisonResponse,
+  FeedResponse,
+  UserResponse,
+} from "./contracts";
 import { useDemoContext } from "./demo-context";
 
 export function useDemoUsers() {
@@ -79,10 +92,12 @@ export function useDemoUsers() {
 
 export function useFeedResponse({
   userId,
+  sessionId,
   limit,
   offset,
 }: {
   userId: string | null;
+  sessionId?: string;
   limit: number;
   offset: number;
 }) {
@@ -107,6 +122,7 @@ export function useFeedResponse({
       try {
         const response = await feedApi.getFeed({
           userId: resolvedUserId,
+          sessionId,
           limit,
           offset,
         });
@@ -132,7 +148,7 @@ export function useFeedResponse({
     return () => {
       isCancelled = true;
     };
-  }, [limit, offset, userId]);
+  }, [limit, offset, sessionId, userId]);
 
   return { feed, isLoading, error };
 }
@@ -177,4 +193,108 @@ export function usePublishedContent(limit: number) {
   }, [limit]);
 
   return { catalog, isLoading, error };
+}
+
+export function useExperimentAssignment(userId: string | null) {
+  const [assignment, setAssignment] = useState<ExperimentAssignmentResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setAssignment(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const resolvedUserId = userId;
+
+    async function loadAssignment() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await experimentationApi.getAssignment(resolvedUserId);
+        if (!isCancelled) {
+          setAssignment(response);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setError(
+            error instanceof ApiError
+              ? error.detail
+              : "Unable to load the experiment assignment.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadAssignment();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId]);
+
+  return { assignment, isLoading, error };
+}
+
+export function useExperimentComparison(
+  experimentKey: string | null,
+  lookbackHours = 168,
+) {
+  const [comparison, setComparison] = useState<ExperimentComparisonResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!experimentKey) {
+      setComparison(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const resolvedExperimentKey = experimentKey;
+
+    async function loadComparison() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await analyticsApi.getExperimentComparison({
+          experimentKey: resolvedExperimentKey,
+          lookbackHours,
+        });
+        if (!isCancelled) {
+          setComparison(response);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setError(
+            error instanceof ApiError
+              ? error.detail
+              : "Unable to load the experiment comparison.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadComparison();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [experimentKey, lookbackHours]);
+
+  return { comparison, isLoading, error };
 }

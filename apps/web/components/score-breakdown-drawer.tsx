@@ -70,6 +70,10 @@ export function ScoreBreakdownDrawer({ item, isOpen, onClose }: ScoreBreakdownDr
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <SummaryTile label="Final score" value={formatScore(item.score)} />
               <SummaryTile
+                label="Strategy adjustment"
+                value={item.score_breakdown.strategy_adjustment.toFixed(3)}
+              />
+              <SummaryTile
                 label="Diversity penalty"
                 value={item.score_breakdown.diversity_penalty.toFixed(3)}
               />

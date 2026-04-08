@@ -128,6 +128,12 @@ const Home = () => {
                 >
                   Explore profile and analytics
                 </Link>
+                <Link
+                  href="/experiments"
+                  className="rounded-full border border-[color:var(--border-subtle)] bg-white px-5 py-3 text-sm font-semibold text-[color:var(--ink-strong)] transition hover:border-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
+                >
+                  Open experiment dashboard
+                </Link>
               </div>
             </SurfaceCard>
 
