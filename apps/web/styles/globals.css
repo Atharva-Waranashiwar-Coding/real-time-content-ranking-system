@@ -2,14 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --bg-app: #fcfbf7;
+    --surface-strong: #ffffff;
+    --surface-muted: #f1ede4;
+    --surface-glass: rgba(252, 251, 247, 0.85);
+    --ink-strong: #162235;
+    --ink-soft: #51606f;
+    --border-subtle: rgba(100, 116, 139, 0.18);
+    --accent: #0f766e;
+    --accent-strong: #0f5c56;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #__next {
+    min-height: 100%;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-app);
+    color: var(--ink-strong);
+    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: rgba(15, 118, 110, 0.18);
+    color: var(--ink-strong);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Source Sans Pro",
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.font-heading {
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
