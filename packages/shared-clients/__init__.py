@@ -5,9 +5,48 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Any, Protocol
 
 import httpx
+
+from shared_config import settings as base_settings
+from shared_logging import observe_dependency_request, record_retry_attempt
+
+RETRYABLE_HTTP_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+
+@dataclass(frozen=True)
+class RetryPolicy:
+    """Retry policy for external dependencies."""
+
+    max_attempts: int = 1
+    initial_delay_seconds: float = 0.0
+    max_delay_seconds: float = 0.0
+    backoff_multiplier: float = 2.0
+
+    def next_delay(self, current_delay: float) -> float:
+        """Return the next bounded delay value."""
+
+        if current_delay <= 0:
+            current_delay = self.initial_delay_seconds
+        if current_delay <= 0:
+            return 0.0
+        return min(current_delay * self.backoff_multiplier, self.max_delay_seconds)
+
+
+DEFAULT_HTTP_RETRY_POLICY = RetryPolicy(
+    max_attempts=base_settings.HTTP_CLIENT_RETRY_MAX_ATTEMPTS,
+    initial_delay_seconds=base_settings.HTTP_CLIENT_RETRY_INITIAL_DELAY_SECONDS,
+    max_delay_seconds=base_settings.HTTP_CLIENT_RETRY_MAX_DELAY_SECONDS,
+    backoff_multiplier=base_settings.HTTP_CLIENT_RETRY_BACKOFF_MULTIPLIER,
+)
+DEFAULT_KAFKA_RETRY_POLICY = RetryPolicy(
+    max_attempts=base_settings.KAFKA_PUBLISH_RETRY_MAX_ATTEMPTS,
+    initial_delay_seconds=base_settings.KAFKA_PUBLISH_RETRY_INITIAL_DELAY_SECONDS,
+    max_delay_seconds=base_settings.KAFKA_PUBLISH_RETRY_MAX_DELAY_SECONDS,
+    backoff_multiplier=base_settings.KAFKA_PUBLISH_RETRY_BACKOFF_MULTIPLIER,
+)
 
 
 async def create_http_client(timeout: float = 10.0) -> httpx.AsyncClient:
@@ -19,11 +58,22 @@ async def create_http_client(timeout: float = 10.0) -> httpx.AsyncClient:
 class ServiceClient:
     """Base client for inter-service HTTP communication."""
 
-    def __init__(self, base_url: str, timeout: float = 10.0):
+    def __init__(
+        self,
+        base_url: str,
+        timeout: float = 10.0,
+        *,
+        caller_service: str | None = None,
+        dependency_name: str | None = None,
+        retry_policy: RetryPolicy | None = None,
+    ):
         """Initialize a service client."""
 
         self.base_url = base_url
         self.timeout = timeout
+        self.caller_service = caller_service
+        self.dependency_name = dependency_name
+        self.retry_policy = retry_policy or DEFAULT_HTTP_RETRY_POLICY
         self.client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> ServiceClient:
@@ -41,16 +91,95 @@ class ServiceClient:
     async def get(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a GET request."""
 
-        if not self.client:
-            raise RuntimeError("Client not initialized. Use async context manager.")
-        return await self.client.get(f"{self.base_url}{path}", **kwargs)
+        return await self.request("GET", path, **kwargs)
 
     async def post(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a POST request."""
 
+        return await self.request("POST", path, **kwargs)
+
+    async def request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        """Make an outbound HTTP request with retry/backoff instrumentation."""
+
         if not self.client:
             raise RuntimeError("Client not initialized. Use async context manager.")
-        return await self.client.post(f"{self.base_url}{path}", **kwargs)
+
+        delay_seconds = self.retry_policy.initial_delay_seconds
+        operation = method.upper()
+        for attempt in range(1, self.retry_policy.max_attempts + 1):
+            started_at = perf_counter()
+            try:
+                response = await self.client.request(
+                    operation,
+                    f"{self.base_url}{path}",
+                    **kwargs,
+                )
+            except httpx.TransportError:
+                duration_seconds = perf_counter() - started_at
+                self._record_dependency(
+                    operation=operation,
+                    duration_seconds=duration_seconds,
+                    outcome="transport_error",
+                )
+                if attempt >= self.retry_policy.max_attempts:
+                    raise
+                self._record_retry(operation)
+                await asyncio.sleep(delay_seconds)
+                delay_seconds = self.retry_policy.next_delay(delay_seconds)
+                continue
+
+            duration_seconds = perf_counter() - started_at
+            outcome = (
+                "success"
+                if response.status_code not in RETRYABLE_HTTP_STATUS_CODES
+                else f"status_{response.status_code}"
+            )
+            self._record_dependency(
+                operation=operation,
+                duration_seconds=duration_seconds,
+                outcome=outcome,
+            )
+            if (
+                response.status_code in RETRYABLE_HTTP_STATUS_CODES
+                and attempt < self.retry_policy.max_attempts
+            ):
+                self._record_retry(operation)
+                await asyncio.sleep(delay_seconds)
+                delay_seconds = self.retry_policy.next_delay(delay_seconds)
+                continue
+            return response
+
+        raise RuntimeError("HTTP request retry loop exited unexpectedly")
+
+    def _record_dependency(
+        self,
+        *,
+        operation: str,
+        duration_seconds: float,
+        outcome: str,
+    ) -> None:
+        """Record outbound dependency metrics when caller metadata is available."""
+
+        if self.caller_service is None or self.dependency_name is None:
+            return
+        observe_dependency_request(
+            service_name=self.caller_service,
+            dependency_name=self.dependency_name,
+            operation=operation,
+            outcome=outcome,
+            duration_seconds=duration_seconds,
+        )
+
+    def _record_retry(self, operation: str) -> None:
+        """Record retry attempts when caller metadata is available."""
+
+        if self.caller_service is None or self.dependency_name is None:
+            return
+        record_retry_attempt(
+            service_name=self.caller_service,
+            dependency_name=self.dependency_name,
+            operation=operation,
+        )
 
 
 class KafkaProducerError(RuntimeError):
@@ -84,6 +213,18 @@ class KafkaRecord:
     timestamp_ms: int | None = None
 
 
+@dataclass(frozen=True)
+class KafkaLagSnapshot:
+    """Kafka consumer lag snapshot for a single partition."""
+
+    group_id: str
+    topic: str
+    partition: int
+    current_offset: int
+    end_offset: int
+    lag: int
+
+
 class KafkaProducer(Protocol):
     """Protocol used by services that publish Kafka events."""
 
@@ -103,6 +244,9 @@ class KafkaConsumer(Protocol):
     async def commit(self, record: KafkaRecord) -> None:
         """Commit the offset for a successfully processed Kafka record."""
 
+    async def lag_snapshots(self) -> list[KafkaLagSnapshot]:
+        """Return lag snapshots for the consumer's assigned partitions."""
+
     async def close(self) -> None:
         """Close consumer resources."""
 
@@ -116,6 +260,7 @@ class ConfluentKafkaProducer:
         client_id: str,
         delivery_timeout_ms: int = 5000,
         flush_timeout_seconds: float = 5.0,
+        retry_policy: RetryPolicy | None = None,
         extra_config: dict[str, Any] | None = None,
     ):
         """Initialize the producer with conservative defaults."""
@@ -133,12 +278,46 @@ class ConfluentKafkaProducer:
             producer_config.update(extra_config)
 
         self._producer = Producer(producer_config)
+        self._client_id = client_id
         self._flush_timeout_seconds = flush_timeout_seconds
+        self._retry_policy = retry_policy or DEFAULT_KAFKA_RETRY_POLICY
 
     async def publish(self, message: KafkaMessage) -> None:
         """Publish a message and wait for delivery confirmation."""
 
-        await asyncio.to_thread(self._publish_sync, message)
+        delay_seconds = self._retry_policy.initial_delay_seconds
+        for attempt in range(1, self._retry_policy.max_attempts + 1):
+            started_at = perf_counter()
+            try:
+                await asyncio.to_thread(self._publish_sync, message)
+            except KafkaProducerError:
+                duration_seconds = perf_counter() - started_at
+                observe_dependency_request(
+                    service_name=self._client_id,
+                    dependency_name="kafka",
+                    operation="PUBLISH",
+                    outcome="error",
+                    duration_seconds=duration_seconds,
+                )
+                if attempt >= self._retry_policy.max_attempts:
+                    raise
+                record_retry_attempt(
+                    service_name=self._client_id,
+                    dependency_name="kafka",
+                    operation="PUBLISH",
+                )
+                await asyncio.sleep(delay_seconds)
+                delay_seconds = self._retry_policy.next_delay(delay_seconds)
+                continue
+
+            observe_dependency_request(
+                service_name=self._client_id,
+                dependency_name="kafka",
+                operation="PUBLISH",
+                outcome="success",
+                duration_seconds=perf_counter() - started_at,
+            )
+            return
 
     async def close(self) -> None:
         """Flush producer buffers on shutdown."""
@@ -207,6 +386,7 @@ class ConfluentKafkaConsumer:
             consumer_config.update(extra_config)
 
         self._consumer = Consumer(consumer_config)
+        self._group_id = group_id
         self._consumer.subscribe(topics)
         self._raw_messages: dict[tuple[str, int | None, int | None], Any] = {}
 
@@ -224,6 +404,11 @@ class ConfluentKafkaConsumer:
         """Close the underlying consumer."""
 
         await asyncio.to_thread(self._consumer.close)
+
+    async def lag_snapshots(self) -> list[KafkaLagSnapshot]:
+        """Return current lag information for assigned partitions."""
+
+        return await asyncio.to_thread(self._lag_snapshots_sync)
 
     def _poll_sync(self, timeout_seconds: float) -> KafkaRecord | None:
         """Perform the blocking Kafka poll."""
@@ -284,6 +469,38 @@ class ConfluentKafkaConsumer:
                 f"Failed to commit Kafka offset for topic {record.topic}"
             ) from exc
 
+    def _lag_snapshots_sync(self) -> list[KafkaLagSnapshot]:
+        """Fetch lag snapshots for assigned partitions."""
+
+        assignments = self._consumer.assignment()
+        if not assignments:
+            return []
+
+        positions = self._consumer.position(assignments)
+        snapshots: list[KafkaLagSnapshot] = []
+        for topic_partition in positions:
+            low_offset, high_offset = self._consumer.get_watermark_offsets(
+                topic_partition,
+                timeout=1.0,
+                cached=False,
+            )
+            current_offset = (
+                topic_partition.offset
+                if topic_partition.offset is not None and topic_partition.offset >= 0
+                else low_offset
+            )
+            snapshots.append(
+                KafkaLagSnapshot(
+                    group_id=self._group_id,
+                    topic=topic_partition.topic,
+                    partition=topic_partition.partition,
+                    current_offset=current_offset,
+                    end_offset=high_offset,
+                    lag=max(high_offset - current_offset, 0),
+                )
+            )
+        return snapshots
+
 
 def create_kafka_producer(
     bootstrap_servers: str,
@@ -295,6 +512,7 @@ def create_kafka_producer(
     return ConfluentKafkaProducer(
         bootstrap_servers=bootstrap_servers,
         client_id=client_id,
+        retry_policy=DEFAULT_KAFKA_RETRY_POLICY,
         extra_config=extra_config,
     )
 
@@ -324,10 +542,12 @@ __all__ = [
     "ConfluentKafkaProducer",
     "KafkaConsumer",
     "KafkaConsumerError",
+    "KafkaLagSnapshot",
     "KafkaMessage",
     "KafkaProducer",
     "KafkaProducerError",
     "KafkaRecord",
+    "RetryPolicy",
     "ServiceClient",
     "create_kafka_consumer",
     "create_http_client",

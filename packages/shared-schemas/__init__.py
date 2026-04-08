@@ -51,6 +51,8 @@ class CandidateSource(str, Enum):
 
 INTERACTION_EVENT_V1_SCHEMA_NAME = "interaction_event.v1"
 INTERACTIONS_EVENTS_V1_TOPIC = "interactions.events.v1"
+DEAD_LETTER_EVENT_V1_SCHEMA_NAME = "dead_letter_event.v1"
+INTERACTIONS_EVENTS_DLQ_V1_TOPIC = "interactions.events.dlq.v1"
 CONTENT_FEATURES_V1_SCHEMA_NAME = "content_features.v1"
 USER_TOPIC_AFFINITY_V1_SCHEMA_NAME = "user_topic_affinity.v1"
 RANKING_REQUEST_V1_SCHEMA_NAME = "ranking_request.v1"
@@ -1084,6 +1086,25 @@ class HealthCheckResponse(BaseModel):
     timestamp: datetime
 
 
+class DeadLetterEventV1Schema(BaseModel):
+    """Dead-letter event envelope for failed Kafka message processing."""
+
+    schema_name: str = DEAD_LETTER_EVENT_V1_SCHEMA_NAME
+    source_topic: str
+    source_partition: int | None = None
+    source_offset: int | None = None
+    source_key: str | None = None
+    source_headers: dict[str, str] = Field(default_factory=dict)
+    failed_service: str
+    error_type: str
+    error_message: str
+    payload: dict[str, Any]
+    request_id: str | None = None
+    correlation_id: str | None = None
+    attempt_count: int = Field(ge=1)
+    occurred_at: datetime = Field(default_factory=utc_now)
+
+
 class ErrorResponse(BaseModel):
     """Standard error response."""
 
@@ -1110,7 +1131,9 @@ __all__ = [
     "ContentStatus",
     "ContentTagSchema",
     "CONTENT_FEATURES_V1_SCHEMA_NAME",
+    "DEAD_LETTER_EVENT_V1_SCHEMA_NAME",
     "DEFAULT_FEATURE_WINDOW_HOURS",
+    "DeadLetterEventV1Schema",
     "ErrorResponse",
     "EXPERIMENT_ASSIGNMENT_V1_SCHEMA_NAME",
     "EXPERIMENT_COMPARISON_V1_SCHEMA_NAME",
@@ -1126,6 +1149,7 @@ __all__ = [
     "HealthCheckResponse",
     "HOME_FEED_RANKING_EXPERIMENT_KEY",
     "INTERACTION_EVENT_V1_SCHEMA_NAME",
+    "INTERACTIONS_EVENTS_DLQ_V1_TOPIC",
     "INTERACTIONS_EVENTS_V1_TOPIC",
     "InteractionAcceptedResponse",
     "InteractionEventV1Schema",

@@ -1,7 +1,7 @@
 """Shared configuration for the real-time content ranking system."""
 
 import os
-from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 
@@ -28,6 +28,32 @@ class Settings(BaseSettings):
 
     # Kafka Configuration
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+
+    # Resilience Configuration
+    HTTP_CLIENT_RETRY_MAX_ATTEMPTS: int = int(
+        os.getenv("HTTP_CLIENT_RETRY_MAX_ATTEMPTS", "3")
+    )
+    HTTP_CLIENT_RETRY_INITIAL_DELAY_SECONDS: float = float(
+        os.getenv("HTTP_CLIENT_RETRY_INITIAL_DELAY_SECONDS", "0.1")
+    )
+    HTTP_CLIENT_RETRY_MAX_DELAY_SECONDS: float = float(
+        os.getenv("HTTP_CLIENT_RETRY_MAX_DELAY_SECONDS", "1.0")
+    )
+    HTTP_CLIENT_RETRY_BACKOFF_MULTIPLIER: float = float(
+        os.getenv("HTTP_CLIENT_RETRY_BACKOFF_MULTIPLIER", "2.0")
+    )
+    KAFKA_PUBLISH_RETRY_MAX_ATTEMPTS: int = int(
+        os.getenv("KAFKA_PUBLISH_RETRY_MAX_ATTEMPTS", "3")
+    )
+    KAFKA_PUBLISH_RETRY_INITIAL_DELAY_SECONDS: float = float(
+        os.getenv("KAFKA_PUBLISH_RETRY_INITIAL_DELAY_SECONDS", "0.1")
+    )
+    KAFKA_PUBLISH_RETRY_MAX_DELAY_SECONDS: float = float(
+        os.getenv("KAFKA_PUBLISH_RETRY_MAX_DELAY_SECONDS", "1.0")
+    )
+    KAFKA_PUBLISH_RETRY_BACKOFF_MULTIPLIER: float = float(
+        os.getenv("KAFKA_PUBLISH_RETRY_BACKOFF_MULTIPLIER", "2.0")
+    )
 
     # API Configuration
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
