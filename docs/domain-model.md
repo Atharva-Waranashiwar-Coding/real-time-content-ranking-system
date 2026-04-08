@@ -66,6 +66,29 @@
 │ published_at (nullable)            │
 │ updated_at                         │
 └────────────────────────────────────┘
+
+
+┌────────────────────────────────────┐
+│  interactions                      │
+├────────────────────────────────────┤
+│ id (PK)                            │
+│ event_id (UNIQUE)                  │
+│ schema_name                        │
+│ event_type                         │
+│ user_id                            │
+│ content_id                         │
+│ session_id                         │
+│ topic                              │
+│ watch_duration_seconds             │
+│ metadata                           │
+│ event_payload                      │
+│ kafka_topic                        │
+│ request_id                         │
+│ correlation_id                     │
+│ event_timestamp                    │
+│ created_at                         │
+│ published_at (nullable)            │
+└────────────────────────────────────┘
 ```
 
 ## Core Entities
@@ -182,6 +205,44 @@ Core content entity representing an article, tutorial, or resource.
   "watch_completes": 6
 }
 ```
+
+### Interaction
+
+Immutable interaction audit record created by `interaction-service`.
+
+**Fields:**
+- `id`: UUID (primary key)
+- `event_id`: UUID, unique idempotency boundary for the ingested event
+- `schema_name`: explicit schema identifier, currently `interaction_event.v1`
+- `event_type`: enum (`impression`, `click`, `like`, `save`, `skip`, `watch_start`, `watch_complete`)
+- `user_id`: UUID of the acting user
+- `content_id`: UUID of the content item
+- `session_id`: optional request/session identifier
+- `topic`: optional normalized topic slug
+- `watch_duration_seconds`: non-negative integer
+- `metadata`: JSON metadata attached by the caller
+- `event_payload`: canonical event payload stored for replay
+- `kafka_topic`: currently `interactions.events.v1`
+- `request_id`: request-scoped identifier for tracing
+- `correlation_id`: distributed correlation identifier
+- `event_timestamp`: time the event occurred
+- `created_at`: time the service persisted the event
+- `published_at`: time the event was successfully published to Kafka, nullable on broker failure
+
+**Indexes:**
+- event_id
+- schema_name
+- event_type
+- user_id
+- content_id
+- session_id
+- topic
+- kafka_topic
+- request_id
+- correlation_id
+- event_timestamp
+- created_at
+- published_at
 
 ## Data Types and Constraints
 
