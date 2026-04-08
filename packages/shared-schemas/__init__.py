@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from enum import Enum
+from math import isfinite
 from typing import Any
 from uuid import UUID
 
@@ -42,6 +43,9 @@ class ContentStatus(str, Enum):
 
 INTERACTION_EVENT_V1_SCHEMA_NAME = "interaction_event.v1"
 INTERACTIONS_EVENTS_V1_TOPIC = "interactions.events.v1"
+CONTENT_FEATURES_V1_SCHEMA_NAME = "content_features.v1"
+USER_TOPIC_AFFINITY_V1_SCHEMA_NAME = "user_topic_affinity.v1"
+DEFAULT_FEATURE_WINDOW_HOURS = 24
 RANKING_TOPICS = tuple(category.value for category in ContentCategory)
 
 
@@ -290,6 +294,140 @@ class InteractionAcceptedResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ContentFeaturesV1Schema(BaseModel):
+    """Versioned content feature vector used by downstream ranking consumers."""
+
+    schema_name: str = Field(
+        default=CONTENT_FEATURES_V1_SCHEMA_NAME,
+        description="Explicit schema identifier for content feature consumers",
+    )
+    content_id: UUID
+    topic: str | None = Field(default=None, max_length=100)
+    window_hours: int = Field(default=DEFAULT_FEATURE_WINDOW_HOURS, ge=1, le=720)
+    impressions: int = Field(default=0, ge=0)
+    clicks: int = Field(default=0, ge=0)
+    likes: int = Field(default=0, ge=0)
+    saves: int = Field(default=0, ge=0)
+    skip_count: int = Field(default=0, ge=0)
+    watch_starts: int = Field(default=0, ge=0)
+    watch_completes: int = Field(default=0, ge=0)
+    ctr: float = Field(default=0.0, ge=0.0, le=1.0)
+    like_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    save_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    skip_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    completion_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    trending_score: float = 0.0
+    last_event_at: datetime | None = None
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        """Keep the content feature schema identifier explicit and versioned."""
+
+        if value != CONTENT_FEATURES_V1_SCHEMA_NAME:
+            raise ValueError(
+                f"schema_name must be '{CONTENT_FEATURES_V1_SCHEMA_NAME}'"
+            )
+        return value
+
+    @field_validator("topic", mode="before")
+    @classmethod
+    def normalize_topic(cls, value: str | None) -> str | None:
+        """Normalize optional topic slugs."""
+
+        if value is None:
+            return None
+
+        normalized = value.strip().lower()
+        return normalized or None
+
+    @field_validator("last_event_at", "updated_at")
+    @classmethod
+    def ensure_timezone_aware_timestamp(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        """Coerce naive timestamps to UTC for consistent feature storage."""
+
+        if value is None:
+            return None
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
+class UserTopicAffinityV1Schema(BaseModel):
+    """Versioned user topic affinity vector for ranking consumers."""
+
+    schema_name: str = Field(
+        default=USER_TOPIC_AFFINITY_V1_SCHEMA_NAME,
+        description="Explicit schema identifier for user affinity consumers",
+    )
+    user_id: UUID
+    window_hours: int = Field(default=DEFAULT_FEATURE_WINDOW_HOURS, ge=1, le=720)
+    topic_affinity: dict[str, float] = Field(default_factory=dict)
+    last_event_at: datetime | None = None
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        """Keep the user affinity schema identifier explicit and versioned."""
+
+        if value != USER_TOPIC_AFFINITY_V1_SCHEMA_NAME:
+            raise ValueError(
+                f"schema_name must be '{USER_TOPIC_AFFINITY_V1_SCHEMA_NAME}'"
+            )
+        return value
+
+    @field_validator("topic_affinity")
+    @classmethod
+    def validate_topic_affinity(
+        cls,
+        value: dict[str, float],
+    ) -> dict[str, float]:
+        """Validate shared user affinity scores across supported topics."""
+
+        normalized_affinity: dict[str, float] = {}
+        for raw_topic, raw_score in value.items():
+            topic = raw_topic.strip().lower()
+            if not topic:
+                raise ValueError("Topic affinity keys must be non-empty")
+            if topic not in RANKING_TOPICS:
+                raise ValueError(
+                    f"Topic '{topic}' is not supported. Allowed topics: {', '.join(RANKING_TOPICS)}"
+                )
+            if not isinstance(raw_score, (int, float)):
+                raise ValueError(f"Topic '{topic}' score must be numeric")
+
+            score = float(raw_score)
+            if not isfinite(score):
+                raise ValueError(f"Topic '{topic}' score must be finite")
+
+            normalized_affinity[topic] = score
+
+        return normalized_affinity
+
+    @field_validator("last_event_at", "updated_at")
+    @classmethod
+    def ensure_timezone_aware_timestamp(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        """Coerce naive timestamps to UTC for consistent feature storage."""
+
+        if value is None:
+            return None
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
 class HealthCheckResponse(BaseModel):
     """Standard health check response."""
 
@@ -319,9 +457,12 @@ class PaginationParams(BaseModel):
 
 __all__ = [
     "ContentCategory",
+    "ContentFeaturesV1Schema",
     "ContentMetadataSchema",
     "ContentStatus",
     "ContentTagSchema",
+    "CONTENT_FEATURES_V1_SCHEMA_NAME",
+    "DEFAULT_FEATURE_WINDOW_HOURS",
     "ErrorResponse",
     "HealthCheckResponse",
     "INTERACTION_EVENT_V1_SCHEMA_NAME",
@@ -333,6 +474,8 @@ __all__ = [
     "PaginationParams",
     "RANKING_TOPICS",
     "TopicPreferencesSchema",
+    "USER_TOPIC_AFFINITY_V1_SCHEMA_NAME",
+    "UserTopicAffinityV1Schema",
     "UserProfileBaseSchema",
     "UserSummarySchema",
     "normalize_topic_preferences",
