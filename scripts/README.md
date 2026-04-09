@@ -60,6 +60,7 @@ bash scripts/run_migrations.sh
 ```
 
 This helper prefers the active virtualenv's `alembic` binary, then falls back to `.venv/bin/alembic` if present.
+If migrations fail with a missing `greenlet` error, install the updated requirements in the active virtualenv before retrying.
 
 ## Other Utilities
 

@@ -141,6 +141,17 @@ for service in services/*; do
 done
 ```
 
+If you already created `.venv` before the latest fixes, repair it with:
+
+```bash
+pip install greenlet==3.0.3
+for service in services/*; do
+  if [ -f "$service/requirements.txt" ]; then
+    pip install -r "$service/requirements.txt"
+  fi
+done
+```
+
 ### 3. Run database migrations
 
 ```bash
