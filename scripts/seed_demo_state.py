@@ -45,6 +45,16 @@ async def _delete_matching_rows(session, sql: str, parameter_name: str, values: 
     await session.execute(statement, {parameter_name: values})
 
 
+def _content_feature_payload(row: dict[str, object]) -> dict[str, object]:
+    """Return only shared-schema feature fields from a snapshot-ready row."""
+
+    return {
+        field_name: row[field_name]
+        for field_name in ContentFeaturesV1Schema.model_fields
+        if field_name in row
+    }
+
+
 async def seed_demo_state() -> None:
     """Seed Redis features plus experiment and interaction demo rows."""
 
@@ -337,7 +347,7 @@ async def seed_demo_state() -> None:
 
             content_snapshot_rows = []
             for row in content_feature_rows:
-                schema = ContentFeaturesV1Schema.model_validate(row)
+                schema = ContentFeaturesV1Schema.model_validate(_content_feature_payload(row))
                 content_snapshot_rows.append(
                     {
                         **schema.model_dump(mode="json"),
@@ -470,7 +480,7 @@ async def seed_demo_state() -> None:
 
         print_step("DEMO", "Writing low-latency feature hashes to Redis...")
         for row in content_feature_rows:
-            schema = ContentFeaturesV1Schema.model_validate(row)
+            schema = ContentFeaturesV1Schema.model_validate(_content_feature_payload(row))
             await redis_client.hset(
                 f"feature:content:{schema.content_id}:v1",
                 mapping=schema.model_dump(mode="json"),
