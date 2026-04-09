@@ -2,11 +2,18 @@
 
 import os
 
-from pydantic_settings import BaseSettings
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     # Service Configuration
     SERVICE_NAME: str = "ranking-service"
@@ -63,6 +70,24 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def _coerce_debug_flag(cls, value: object) -> bool:
+        """Coerce common shell DEBUG values into a stable boolean."""
+
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+
+        normalized = str(value).strip().lower()
+        if normalized in {"1", "true", "yes", "on", "debug"}:
+            return True
+        if normalized in {"0", "false", "no", "off", "release", "prod", "production", ""}:
+            return False
+
+        return False
+
     @property
     def database_url(self) -> str:
         """Construct PostgreSQL connection URL."""
@@ -84,11 +109,6 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         """Construct Redis connection URL."""
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-
 
 settings = Settings()
 
