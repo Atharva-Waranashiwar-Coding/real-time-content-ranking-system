@@ -53,6 +53,14 @@ bash scripts/run_service.sh feed-service
 
 This helper sets the repository root on `PYTHONPATH`, loads repo-local shared packages, and starts `uvicorn` with the correct service directory and default port.
 
+### Run all required Alembic migrations
+
+```bash
+bash scripts/run_migrations.sh
+```
+
+This helper prefers the active virtualenv's `alembic` binary, then falls back to `.venv/bin/alembic` if present.
+
 ## Other Utilities
 
 - `format.sh`: repository formatting helper

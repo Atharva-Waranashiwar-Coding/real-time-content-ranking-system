@@ -144,26 +144,7 @@ done
 ### 3. Run database migrations
 
 ```bash
-(
-  cd services/user-service &&
-  PYTHONPATH=../.. python3.11 -m alembic upgrade head
-)
-(
-  cd services/content-service &&
-  PYTHONPATH=../.. python3.11 -m alembic upgrade head
-)
-(
-  cd services/interaction-service &&
-  PYTHONPATH=../.. python3.11 -m alembic upgrade head
-)
-(
-  cd services/experimentation-service &&
-  PYTHONPATH=../.. python3.11 -m alembic upgrade head
-)
-(
-  cd services/feature-processor &&
-  PYTHONPATH=../.. python3.11 -m alembic upgrade head
-)
+bash scripts/run_migrations.sh
 ```
 
 ### 4. Load deterministic demo data
