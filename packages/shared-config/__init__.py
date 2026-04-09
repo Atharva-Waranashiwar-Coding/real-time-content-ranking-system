@@ -72,6 +72,15 @@ class Settings(BaseSettings):
         )
 
     @property
+    def sync_database_url(self) -> str:
+        """Construct a synchronous PostgreSQL connection URL for Alembic."""
+
+        return (
+            f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+    @property
     def redis_url(self) -> str:
         """Construct Redis connection URL."""
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"

@@ -20,8 +20,8 @@ if alembic_cfg.config_file_name is not None:
     fileConfig(alembic_cfg.config_file_name)
 logger = logging.getLogger("alembic.env")
 
-# Set the SQLAlchemy URL dynamically
-alembic_cfg.set_main_option("sqlalchemy.url", config.DATABASE_URL)
+# Alembic runs synchronously, so use a sync PostgreSQL driver here.
+alembic_cfg.set_main_option("sqlalchemy.url", config.DATABASE_URL.replace("+asyncpg", "+psycopg2"))
 
 # Add models for autogenerate support
 target_metadata = Base.metadata

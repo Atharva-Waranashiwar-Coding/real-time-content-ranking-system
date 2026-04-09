@@ -114,6 +114,9 @@ Shared packages:
 - Node.js 18+
 - Docker with `docker compose`
 
+If your default `python` points to 3.13 or an Anaconda base environment, use `python3.11`
+explicitly for the virtual environment and migration commands.
+
 ### 1. Start infrastructure
 
 ```bash
@@ -127,7 +130,7 @@ This starts PostgreSQL, Redis, Kafka, Zookeeper, Prometheus, and Grafana.
 ### 2. Create a Python environment and install dependencies
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -r scripts/requirements.txt
@@ -143,23 +146,23 @@ done
 ```bash
 (
   cd services/user-service &&
-  PYTHONPATH=../.. alembic upgrade head
+  PYTHONPATH=../.. python3.11 -m alembic upgrade head
 )
 (
   cd services/content-service &&
-  PYTHONPATH=../.. alembic upgrade head
+  PYTHONPATH=../.. python3.11 -m alembic upgrade head
 )
 (
   cd services/interaction-service &&
-  PYTHONPATH=../.. alembic upgrade head
+  PYTHONPATH=../.. python3.11 -m alembic upgrade head
 )
 (
   cd services/experimentation-service &&
-  PYTHONPATH=../.. alembic upgrade head
+  PYTHONPATH=../.. python3.11 -m alembic upgrade head
 )
 (
   cd services/feature-processor &&
-  PYTHONPATH=../.. alembic upgrade head
+  PYTHONPATH=../.. python3.11 -m alembic upgrade head
 )
 ```
 
