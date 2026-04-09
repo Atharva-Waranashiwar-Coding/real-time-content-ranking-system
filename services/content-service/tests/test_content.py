@@ -105,6 +105,39 @@ class TestContentEndpoints:
         assert data["items"][0]["status"] == "published"
         assert data["items"][0]["category"] == "backend"
 
+    def test_list_content_filters_without_duplicate_rows(self, client):
+        """Filtered content listings should return unique content items."""
+
+        backend_tag = client.post(
+            "/api/v1/tags",
+            json={"name": "backend-platform", "description": "Backend platform content"},
+        ).json()["id"]
+        architecture_tag = client.post(
+            "/api/v1/tags",
+            json={"name": "architecture", "description": "Architecture content"},
+        ).json()["id"]
+
+        published_response = client.post(
+            "/api/v1/content",
+            json={
+                "title": "Reliable Service Boundaries",
+                "description": "Boundary design for backend systems",
+                "topic": "backend",
+                "category": "backend",
+                "status": "published",
+                "tag_ids": [backend_tag, architecture_tag],
+            },
+        )
+        published_content_id = published_response.json()["id"]
+
+        response = client.get("/api/v1/content?status=published&tag=backend-platform")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == published_content_id
+
     def test_publish_content_success(self, client):
         """Test publishing a draft content item."""
 

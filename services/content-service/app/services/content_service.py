@@ -163,7 +163,6 @@ class ContentService:
 
         ordered_query = (
             query
-            .distinct()
             .order_by(ContentItem.published_at.desc().nullslast(), ContentItem.created_at.desc())
             .offset(skip)
             .limit(limit)
