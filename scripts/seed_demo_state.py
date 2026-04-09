@@ -55,6 +55,38 @@ def _content_feature_payload(row: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _content_feature_snapshot_row(
+    schema: ContentFeaturesV1Schema,
+    row: dict[str, object],
+    index: int,
+) -> dict[str, object]:
+    """Build a PostgreSQL snapshot row without JSON-serializing datetimes."""
+
+    return {
+        "id": f"60000000-0000-0000-0000-{index:012d}",
+        "schema_name": schema.schema_name,
+        "content_id": str(schema.content_id),
+        "topic": schema.topic,
+        "window_hours": schema.window_hours,
+        "impressions": schema.impressions,
+        "clicks": schema.clicks,
+        "likes": schema.likes,
+        "saves": schema.saves,
+        "skip_count": schema.skip_count,
+        "watch_starts": schema.watch_starts,
+        "watch_completes": schema.watch_completes,
+        "ctr": schema.ctr,
+        "like_rate": schema.like_rate,
+        "save_rate": schema.save_rate,
+        "skip_rate": schema.skip_rate,
+        "completion_rate": schema.completion_rate,
+        "trending_score": schema.trending_score,
+        "last_event_at": schema.last_event_at,
+        "snapshot_at": row["snapshot_at"],
+        "created_at": row["snapshot_at"],
+    }
+
+
 async def seed_demo_state() -> None:
     """Seed Redis features plus experiment and interaction demo rows."""
 
@@ -346,15 +378,10 @@ async def seed_demo_state() -> None:
             )
 
             content_snapshot_rows = []
-            for row in content_feature_rows:
+            for index, row in enumerate(content_feature_rows, start=1):
                 schema = ContentFeaturesV1Schema.model_validate(_content_feature_payload(row))
                 content_snapshot_rows.append(
-                    {
-                        **schema.model_dump(mode="json"),
-                        "id": f"60000000-0000-0000-0000-{len(content_snapshot_rows) + 1:012d}",
-                        "snapshot_at": row["snapshot_at"],
-                        "created_at": row["snapshot_at"],
-                    }
+                    _content_feature_snapshot_row(schema=schema, row=row, index=index)
                 )
             await session.execute(
                 text(
