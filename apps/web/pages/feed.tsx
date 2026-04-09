@@ -3,10 +3,12 @@ import { startTransition, useEffect, useMemo, useState } from "react";
 
 import { DemoShell } from "../components/demo-shell";
 import { FeedCard } from "../components/feed-card";
+import { FeedVisualStoryboard } from "../components/feed-visual-storyboard";
 import { MetricCard } from "../components/metric-card";
 import { PaginationControls } from "../components/pagination-controls";
 import { ScoreBreakdownDrawer } from "../components/score-breakdown-drawer";
 import { SessionEventStream } from "../components/session-event-stream";
+import { SessionActivityChart } from "../components/session-activity-chart";
 import { StateBlock } from "../components/state-block";
 import { SurfaceCard } from "../components/surface-card";
 import { interactionApi, ApiError } from "../lib/api";
@@ -107,13 +109,13 @@ const FeedPage = () => {
   );
 
   useEffect(() => {
-    if (visibleItems.length === 0) {
+    if (visibleItems.length === 0 || !selectedContentId) {
       setSelectedContentId(null);
       return;
     }
 
-    if (!selectedContentId || !visibleItems.some((item) => item.content_id === selectedContentId)) {
-      setSelectedContentId(visibleItems[0].content_id);
+    if (!visibleItems.some((item) => item.content_id === selectedContentId)) {
+      setSelectedContentId(null);
     }
   }, [selectedContentId, visibleItems]);
 
@@ -156,8 +158,9 @@ const FeedPage = () => {
         setDismissedContentIds((previousIds) =>
           previousIds.includes(item.content_id) ? previousIds : [...previousIds, item.content_id],
         );
-      } else {
-        setSelectedContentId(item.content_id);
+        if (selectedContentId === item.content_id) {
+          setSelectedContentId(null);
+        }
       }
     } catch (error) {
       updateRecentEvent(pendingEvent.local_id, {
@@ -215,6 +218,8 @@ const FeedPage = () => {
 
         <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
+            <FeedVisualStoryboard items={visibleItems} />
+
             <SurfaceCard
               title="Feed runtime"
               description="Operational details from the live feed response."
@@ -342,13 +347,14 @@ const FeedPage = () => {
               </div>
             </SurfaceCard>
 
+            <SessionActivityChart events={recentEvents} />
             <SessionEventStream events={recentEvents} onClear={clearRecentEvents} />
           </div>
         </div>
 
         <ScoreBreakdownDrawer
           item={selectedItem}
-          isOpen={Boolean(selectedItem)}
+          isOpen={Boolean(selectedContentId && selectedItem)}
           onClose={() => setSelectedContentId(null)}
         />
       </DemoShell>

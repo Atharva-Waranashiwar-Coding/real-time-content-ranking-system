@@ -3,6 +3,7 @@ import Head from "next/head";
 import { DemoShell } from "../components/demo-shell";
 import { MetricCard } from "../components/metric-card";
 import { SessionEventStream } from "../components/session-event-stream";
+import { SessionActivityChart } from "../components/session-activity-chart";
 import { StateBlock } from "../components/state-block";
 import { SurfaceCard } from "../components/surface-card";
 import { TopicAffinityChart } from "../components/topic-affinity-chart";
@@ -166,6 +167,8 @@ const InsightsPage = () => {
           </div>
 
           <TrendingChart items={trendingRows} categoryDistribution={categoryDistribution} />
+
+          <SessionActivityChart events={recentEvents} />
 
           <SurfaceCard
             title="Trending item details"
