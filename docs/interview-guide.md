@@ -1,6 +1,6 @@
 # Interview Guide
 
-This project is designed to support both a product demo and a systems-design discussion. Use this guide to keep the explanation focused and credible.
+This project is designed to support both a product walkthrough and a systems-design discussion. Use this guide to keep the explanation focused and credible.
 
 ## 60-Second Version
 
@@ -33,7 +33,7 @@ This is a distributed content-ranking platform for a technical learning feed. Us
 
 ### Why rules-based ranking first?
 
-Because it makes the system explainable, testable, and demoable from day one. The ranking boundary is isolated behind explicit DTOs so a learned model can replace the scorer later without rewriting feed assembly or the frontend contract.
+Because it makes the system explainable, testable, and production-readable from day one. The ranking boundary is isolated behind explicit DTOs so a learned model can replace the scorer later without rewriting feed assembly or the frontend contract.
 
 ### Why Redis plus PostgreSQL?
 
@@ -45,7 +45,7 @@ Kafka decouples ingestion from feature computation and creates a replayable even
 
 ### Why does the frontend call services directly?
 
-Because the current demo optimizes for visibility and explicit contracts. The gateway exists in the repo, but the web app currently uses direct service URLs so each service remains visibly testable during the demo.
+Because the current portfolio build optimizes for visibility and explicit contracts. The gateway exists in the repo, but the web app currently uses direct service URLs so each service remains visibly testable during the walkthrough.
 
 ### What is actually production-oriented versus intentionally simplified?
 
@@ -80,6 +80,6 @@ Intentionally simplified:
 
 - The system has clear event boundaries and explicit versioning.
 - The ranking logic is isolated and replaceable.
-- The demo uses deterministic seed data instead of hand-waved mock state.
+- The project uses deterministic reference data instead of hand-waved mock state.
 - Analytics are exposure-based, not just assignment-based, which is the right attribution model.
 - Operational concerns were treated as first-class features rather than postponed.

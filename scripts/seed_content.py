@@ -1,4 +1,4 @@
-"""Seed script for deterministic demo content items."""
+"""Seed script for deterministic reference content items."""
 
 import asyncio
 import sys
@@ -19,7 +19,7 @@ from app.models import ContentItem, ContentTag
 
 
 async def seed_content() -> None:
-    """Seed demo content items into the database."""
+    """Seed reference content items into the database."""
 
     print_step("CONTENT", "Connecting to database...")
     async_session, engine = await get_async_session()
@@ -47,9 +47,9 @@ async def seed_content() -> None:
                 if existing_tag is not None:
                     if existing_tag.id != tag_data["id"]:
                         raise RuntimeError(
-                            "Found demo tag with non-canonical ID for "
+                            "Found seeded tag with non-canonical ID for "
                             f"{tag_data['name']}. Run scripts/reset_demo_state.py "
-                            "before reseeding demo data."
+                            "before reseeding reference data."
                         )
                     continue
 
@@ -80,7 +80,7 @@ async def seed_content() -> None:
             created_count = 0
             skipped_count = 0
 
-            print_step("CONTENT", "Ensuring demo tags and content items exist...")
+            print_step("CONTENT", "Ensuring reference tags and content items exist...")
             category_counts: dict[str, int] = {}
             for index, item_data in enumerate(demo_content, start=1):
                 category_counts[item_data["category"]] = (
@@ -98,9 +98,9 @@ async def seed_content() -> None:
                     )
                     if existing_item is not None and existing_item.id != item_data["id"]:
                         raise RuntimeError(
-                            "Found demo content with non-canonical ID for "
+                            "Found seeded content with non-canonical ID for "
                             f"{item_data['title']}. Run scripts/reset_demo_state.py "
-                            "before reseeding demo data."
+                            "before reseeding reference data."
                         )
                     skipped_count += 1
                     print(f"  ↷ Skipped existing content: {item_data['title']}")

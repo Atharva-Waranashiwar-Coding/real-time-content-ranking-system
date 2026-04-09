@@ -1,4 +1,4 @@
-"""Seed script for deterministic demo users."""
+"""Seed script for deterministic reference users."""
 
 import asyncio
 import sys
@@ -15,7 +15,7 @@ from app.models import User, UserProfile
 
 
 async def seed_users() -> None:
-    """Seed demo users into the database."""
+    """Seed reference users into the database."""
 
     print_step("USERS", "Connecting to database...")
     async_session, engine = await get_async_session()
@@ -51,21 +51,21 @@ async def seed_users() -> None:
             created_count = 0
             skipped_count = 0
 
-            print_step("USERS", "Ensuring demo users exist...")
+            print_step("USERS", "Ensuring reference user profiles exist...")
             for index, user_data in enumerate(DEMO_USERS, start=1):
                 existing_user = existing_users.get(user_data["username"])
                 if existing_user is not None:
                     if existing_user.id != user_data["id"]:
                         raise RuntimeError(
-                            "Found demo user with non-canonical ID for "
+                            "Found seeded user with non-canonical ID for "
                             f"{user_data['username']}. Run scripts/reset_demo_state.py "
-                            "before reseeding demo data."
+                            "before reseeding reference data."
                         )
                     existing_profile = existing_profiles.get(existing_user.id)
                     if existing_profile is None:
                         raise RuntimeError(
-                            f"Demo profile missing for {user_data['username']}. "
-                            "Run scripts/reset_demo_state.py before reseeding demo data."
+                            f"Reference profile missing for {user_data['username']}. "
+                            "Run scripts/reset_demo_state.py before reseeding reference data."
                         )
                     skipped_count += 1
                     print(f"  ↷ Skipped existing user: {user_data['username']}")
@@ -95,7 +95,7 @@ async def seed_users() -> None:
             await session.commit()
             print_step(
                 "USERS",
-                f"Created {created_count} demo users, skipped {skipped_count} existing users",
+                f"Created {created_count} reference users, skipped {skipped_count} existing users",
             )
     except Exception as e:
         print_error(f"Failed to seed users: {e}")

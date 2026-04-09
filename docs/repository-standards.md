@@ -8,7 +8,7 @@ The repository is organized by responsibility:
 - `packages/`: shared schemas, clients, config, and logging helpers
 - `apps/`: frontend applications
 - `infra/`: Docker, Prometheus, Grafana, and environment bootstrap assets
-- `docs/`: architecture, API, runbooks, demo notes, and interview notes
+- `docs/`: architecture, API, runbooks, reference walkthrough notes, and interview notes
 - `scripts/`: local utilities for running, seeding, linting, and formatting
 
 ## Naming Conventions
@@ -50,7 +50,7 @@ The repository is organized by responsibility:
 
 - keep API contracts typed
 - prefer small reusable components over page-local ad hoc rendering
-- avoid hardcoded fallback data unless it is clearly labeled demo-only data
+- avoid hardcoded fallback data unless it is clearly labeled reference-only data
 
 ## Testing
 
@@ -69,5 +69,5 @@ The repository is organized by responsibility:
 Use conventional commits with a scope where it improves clarity:
 
 - `feat(feed-service): add cached feed assembly`
-- `docs(readme): rewrite setup and demo flow`
+- `docs(readme): rewrite setup and product walkthrough`
 - `chore(repo): remove legacy scaffolding`

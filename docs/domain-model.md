@@ -12,7 +12,7 @@
 
 - one-to-one with `users` via `user_id`
 - stores `bio` and `topic_preferences`
-- purpose: explicit user preference baseline for ranking and demo explainability
+- purpose: explicit user preference baseline for ranking and product explainability
 
 ### `content_items`
 

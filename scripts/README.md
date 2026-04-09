@@ -1,13 +1,13 @@
 # Scripts
 
-This directory contains the local developer utilities used to run, reset, and demo the system.
+This directory contains the local developer utilities used to run, reset, and operate the system.
 
 ## Most Important Commands
 
-### Start the full demo stack with one command
+### Start the full platform stack with one command
 
 ```bash
-bash scripts/run_demo_stack.sh
+bash scripts/run_platform_stack.sh
 ```
 
 This helper will:
@@ -15,27 +15,27 @@ This helper will:
 - start Docker infrastructure and monitoring
 - wait for PostgreSQL, Redis, and Kafka
 - run migrations
-- reseed the deterministic demo data
+- reseed the deterministic reference data
 - start every backend service from the project virtualenv
 - build and start the frontend on `http://localhost:3001`
 
 Related commands:
 
 ```bash
-bash scripts/run_demo_stack.sh status
-bash scripts/run_demo_stack.sh down
+bash scripts/run_platform_stack.sh status
+bash scripts/run_platform_stack.sh down
 ```
 
-### Bootstrap a deterministic demo
+### Bootstrap deterministic reference data
 
 ```bash
-bash scripts/setup_demo.sh
+bash scripts/setup_reference_data.sh
 ```
 
 This sequence:
 
-- removes canonical demo records and Redis keys
-- seeds the 5 demo users and 50+ content items
+- removes canonical reference records and Redis keys
+- seeds the 5 reference users and 50+ content items
 - seeds deterministic Redis feature vectors
 - seeds experiment assignments, exposures, and attributed interaction outcomes
 
@@ -44,13 +44,13 @@ For a fully frozen walkthrough:
 ```bash
 export DEMO_REFERENCE_TIME=2026-04-08T14:00:00+00:00
 export RANKING_FIXED_NOW=2026-04-08T14:00:00+00:00
-bash scripts/setup_demo.sh
+bash scripts/setup_reference_data.sh
 ```
 
-### Reset demo state only
+### Reset reference state only
 
 ```bash
-python scripts/reset_demo_state.py
+python scripts/reset_reference_state.py
 ```
 
 ### Seed canonical users and content only
@@ -63,7 +63,7 @@ python scripts/seed_content.py
 ### Seed deterministic feature and experiment state only
 
 ```bash
-python scripts/seed_demo_state.py
+python scripts/seed_reference_state.py
 ```
 
 ### Run a backend service from source
@@ -99,12 +99,12 @@ Use this when the local database already contains application tables but Alembic
 
 ## Data Contract Notes
 
-The deterministic demo data is defined in `demo_dataset.py`.
+The deterministic reference data is defined in the dataset helper module under `scripts/`.
 
 Key guarantees:
 
-- demo users have fixed UUIDs
-- demo content and tags have fixed UUIDs
+- reference users have fixed UUIDs
+- reference content and tags have fixed UUIDs
 - experiment buckets are deterministic
 - seeded Redis features line up with the published content catalog
 - the experiment dashboard is non-empty immediately after bootstrap

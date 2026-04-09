@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT_DIR}/infra/docker/docker-compose.yml"
-RUNTIME_DIR="${TMPDIR:-/tmp}/content-ranking-system-demo"
+RUNTIME_DIR="${TMPDIR:-/tmp}/content-ranking-system-local-stack"
 PID_DIR="${RUNTIME_DIR}/pids"
 LOG_DIR="${RUNTIME_DIR}/logs"
 
@@ -28,13 +28,13 @@ SERVICES=(
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/run_demo_stack.sh
-  bash scripts/run_demo_stack.sh up
-  bash scripts/run_demo_stack.sh down
-  bash scripts/run_demo_stack.sh status
+  bash scripts/run_platform_stack.sh
+  bash scripts/run_platform_stack.sh up
+  bash scripts/run_platform_stack.sh down
+  bash scripts/run_platform_stack.sh status
 
 Commands:
-  up      Start infra, run migrations, reseed deterministic demo data, start all services, build and start the frontend
+  up      Start infra, run migrations, reseed reference data, start all services, build and start the frontend
   down    Stop all managed app processes and docker compose infrastructure
   status  Show process and health status for the managed stack
 EOF
@@ -293,7 +293,7 @@ bootstrap_stack() {
   log "Running database migrations"
   bash "${ROOT_DIR}/scripts/run_migrations.sh"
 
-  log "Bootstrapping deterministic demo data"
+  log "Bootstrapping reference data"
   bash "${ROOT_DIR}/scripts/setup_demo.sh"
 
   start_backend_service "api-gateway" "8000" "${python_bin}"
@@ -310,7 +310,7 @@ bootstrap_stack() {
 
   cat <<EOF
 
-[stack] Demo stack is ready
+[stack] Platform stack is ready
 [stack] Frontend:              http://localhost:3001
 [stack] API Gateway:           http://localhost:8000/api/v1/health
 [stack] User Service:          http://localhost:8001/api/v1/health
@@ -326,7 +326,7 @@ bootstrap_stack() {
 [stack] Logs:                  ${LOG_DIR}
 
 To stop everything:
-  bash scripts/run_demo_stack.sh down
+  bash scripts/run_platform_stack.sh down
 EOF
 }
 

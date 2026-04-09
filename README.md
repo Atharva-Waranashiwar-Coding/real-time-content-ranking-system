@@ -2,26 +2,26 @@
 
 An event-driven platform that ingests user interactions, materializes ranking features in near real time, and serves an explainable personalized feed with experimentation and operational telemetry built in.
 
-This repository is structured like a serious backend portfolio project rather than a single demo app. It includes domain services, Kafka-based event flow, Redis feature materialization, deterministic ranking, experiment analytics, a polished frontend, and local observability assets.
+This repository is structured like a serious backend portfolio project rather than a toy application. It includes domain services, Kafka-based event flow, Redis feature materialization, deterministic ranking, experiment analytics, a polished frontend, and local observability assets.
 
 ## Project Overview
 
 The system models a LinkedIn-style learning feed for technical content across AI, backend engineering, system design, DevOps, and interview preparation.
 
-What it demonstrates:
+What it shows:
 
 - event-driven ingestion with Kafka and durable audit storage
 - low-latency ranking features in Redis backed by PostgreSQL snapshots
 - deterministic, explainable scoring with multiple ranking strategies
 - experiment assignment, exposure logging, and attributed outcome analytics
-- a demo frontend that makes the distributed system visible instead of hiding it
+- a product-style frontend that makes the distributed system visible instead of hiding it
 - Prometheus, Grafana, structured logging, correlation IDs, and readiness/liveness checks
 
 ## Architecture Diagram
 
 ```mermaid
 flowchart LR
-    Web[Next.js Demo Frontend]
+    Web[Next.js Product Frontend]
     Gateway[API Gateway<br/>health and routing shell]
 
     UserSvc[User Service]
@@ -80,7 +80,7 @@ flowchart LR
 
 Notes:
 
-- The frontend currently talks directly to service endpoints for the demo flow.
+- The frontend currently talks directly to service endpoints for the primary product walkthrough.
 - `api-gateway` exists in the repo, but it is not the primary path for the current web app.
 - Docker Compose provisions infrastructure and monitoring. The repository now includes a one-command stack runner that starts infra, services, seeds, and the frontend together.
 
@@ -97,7 +97,7 @@ Notes:
 | `experimentation-service` | Deterministic assignment and feed exposure persistence | `/api/v1/experiments/*` | PostgreSQL |
 | `analytics-service` | Attributed experiment comparison metrics | `/api/v1/experiments/{key}/comparison` | PostgreSQL |
 | `api-gateway` | Reserved entry shell for routing and platform concerns | health endpoints | none |
-| `apps/web` | Demo UI for feed, insights, and experiment analytics | `/`, `/feed`, `/insights`, `/experiments` | browser state |
+| `apps/web` | Product UI for feed, insights, and experiment analytics | `/`, `/feed`, `/insights`, `/experiments` | browser state |
 
 Shared packages:
 
@@ -108,12 +108,12 @@ Shared packages:
 
 ## Local Setup
 
-### One-command demo stack
+### One-command local stack
 
 After the Python virtualenv and frontend dependencies are installed once, you can boot the full local system with:
 
 ```bash
-bash scripts/run_demo_stack.sh
+bash scripts/run_platform_stack.sh
 ```
 
 This single command will:
@@ -121,15 +121,15 @@ This single command will:
 - start Docker infrastructure and monitoring
 - wait for PostgreSQL, Redis, and Kafka
 - run all Alembic migrations
-- reseed the deterministic demo dataset
+- reseed the deterministic reference dataset
 - start every backend service
 - build and start the frontend on `http://localhost:3001`
 
 Useful follow-up commands:
 
 ```bash
-bash scripts/run_demo_stack.sh status
-bash scripts/run_demo_stack.sh down
+bash scripts/run_platform_stack.sh status
+bash scripts/run_platform_stack.sh down
 ```
 
 ### Prerequisites
@@ -195,18 +195,18 @@ python scripts/reset_local_database.py
 bash scripts/run_migrations.sh
 ```
 
-### 4. Load deterministic demo data
+### 4. Load deterministic reference data
 
 ```bash
-bash scripts/setup_demo.sh
+bash scripts/setup_reference_data.sh
 ```
 
-Optional for a fully frozen demo:
+Optional for a fully frozen walkthrough:
 
 ```bash
 export DEMO_REFERENCE_TIME=2026-04-08T14:00:00+00:00
 export RANKING_FIXED_NOW=2026-04-08T14:00:00+00:00
-bash scripts/setup_demo.sh
+bash scripts/setup_reference_data.sh
 ```
 
 ### 5. Start backend services from source
@@ -251,7 +251,7 @@ npm run dev -- --port 3001
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` with `admin / admin`
 
-## Demo Flow
+## Product Walkthrough
 
 The cleanest walkthrough for a recruiter, hiring manager, or interviewer:
 
@@ -263,7 +263,7 @@ The cleanest walkthrough for a recruiter, hiring manager, or interviewer:
 6. Move to `/experiments` to show deterministic assignment and attributed strategy metrics.
 7. Open Grafana to show request throughput, ranking latency, and event pipeline health.
 
-For a deterministic set of user stories, use the scenarios in [docs/demo-scenarios.md](docs/demo-scenarios.md).
+For a deterministic set of user stories, use the scenarios in [docs/reference-scenarios.md](docs/reference-scenarios.md).
 
 ## Screenshots
 
@@ -280,7 +280,7 @@ Suggested final screenshots:
 
 ```text
 apps/
-  web/                      Frontend demo application
+  web/                      Frontend application
 services/
   api-gateway/              Reserved gateway shell
   user-service/             User and profile domain service
@@ -299,9 +299,9 @@ packages/
 infra/
   docker/                   Compose, Prometheus, Grafana, DB init
 docs/
-  architecture, API, runbooks, demo notes, interview notes
+  architecture, API, runbooks, walkthrough notes, interview notes
 scripts/
-  demo reset/bootstrap helpers, formatting, linting, service runner
+  local reset/bootstrap helpers, formatting, linting, service runner
 ```
 
 ## Why This Project Matters
@@ -319,7 +319,7 @@ This repo is intentionally opinionated:
 - [Architecture overview](docs/architecture-overview.md)
 - [API reference index](docs/api/README.md)
 - [Observability guide](docs/observability.md)
-- [Demo scenarios](docs/demo-scenarios.md)
+- [Reference scenarios](docs/reference-scenarios.md)
 - [Interview guide](docs/interview-guide.md)
 - [Tradeoffs and lessons learned](docs/project-retrospective.md)
 - [Local monitoring runbook](docs/runbooks/local-monitoring.md)

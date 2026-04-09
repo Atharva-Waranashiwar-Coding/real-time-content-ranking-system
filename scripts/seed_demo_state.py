@@ -88,9 +88,9 @@ def _content_feature_snapshot_row(
 
 
 async def seed_demo_state() -> None:
-    """Seed Redis features plus experiment and interaction demo rows."""
+    """Seed Redis features plus deterministic experiment and interaction rows."""
 
-    print_step("DEMO", "Connecting to PostgreSQL and Redis...")
+    print_step("SEED", "Connecting to PostgreSQL and Redis...")
     async_session, engine = await get_async_session()
     redis_client = redis.from_url(get_redis_url(), decode_responses=True)
 
@@ -101,7 +101,7 @@ async def seed_demo_state() -> None:
 
     try:
         async with async_session() as session:
-            print_step("DEMO", "Refreshing deterministic experiment and analytics rows...")
+            print_step("SEED", "Refreshing deterministic experiment and analytics rows...")
             assignment_user_ids = sorted({str(item["user_id"]) for item in assignments})
             content_ids = sorted({str(item["content_id"]) for item in content_feature_rows})
             interaction_ids = [
@@ -302,7 +302,7 @@ async def seed_demo_state() -> None:
                         watch_duration_seconds=interaction["watch_duration_seconds"],
                         event_timestamp=interaction["event_timestamp"],
                         metadata={
-                            "surface": "demo_bootstrap",
+                            "surface": "reference_bootstrap",
                             "source": "scripts/seed_demo_state.py",
                         },
                     )
@@ -505,7 +505,7 @@ async def seed_demo_state() -> None:
 
             await session.commit()
 
-        print_step("DEMO", "Writing low-latency feature hashes to Redis...")
+        print_step("SEED", "Writing low-latency feature hashes to Redis...")
         for row in content_feature_rows:
             schema = ContentFeaturesV1Schema.model_validate(_content_feature_payload(row))
             await redis_client.hset(
@@ -544,7 +544,7 @@ async def seed_demo_state() -> None:
             )
 
         print_step(
-            "DEMO",
+            "SEED",
             (
                 f"Seeded {len(content_feature_rows)} content feature rows, "
                 f"{len(user_topic_rows)} user-topic rows, "
@@ -552,7 +552,7 @@ async def seed_demo_state() -> None:
             ),
         )
     except Exception as exc:
-        print_error(f"Failed to seed demo state: {exc}")
+        print_error(f"Failed to seed reference state: {exc}")
         raise
     finally:
         await redis_client.aclose()
@@ -561,4 +561,4 @@ async def seed_demo_state() -> None:
 
 if __name__ == "__main__":
     asyncio.run(seed_demo_state())
-    print_success("Deterministic demo state seeded")
+    print_success("Deterministic reference state seeded")

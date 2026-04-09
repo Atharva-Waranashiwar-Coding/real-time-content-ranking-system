@@ -55,9 +55,9 @@ Expected patterns:
 - `/api/v1/live`: process is up
 - `/api/v1/ready`: critical dependencies are reachable where the service has direct dependencies
 
-## Recommended Demo Flow
+## Recommended Product Walkthrough
 
-1. Load the web demo on `http://localhost:3001` and request a few feeds.
+1. Load the web product UI on `http://localhost:3001` and request a few feeds.
 2. Trigger `click`, `like`, `save`, and `skip` interactions.
 3. Watch `Event Pipeline` for publish/consume activity.
 4. Inspect `Ranking and Feed Operations` for ranking/feed latency movement.

@@ -10,6 +10,7 @@ import { SessionEventStream } from "../components/session-event-stream";
 import { StateBlock } from "../components/state-block";
 import { SurfaceCard } from "../components/surface-card";
 import { interactionApi, ApiError } from "../lib/api";
+import { formatPageTitle } from "../lib/branding";
 import type { FeedItemResponse, InteractionEventType, SessionEventRecord } from "../lib/contracts";
 import { useDemoUsers, useFeedResponse } from "../lib/demo-hooks";
 import { useDemoContext } from "../lib/demo-context";
@@ -173,13 +174,13 @@ const FeedPage = () => {
   return (
     <>
       <Head>
-        <title>Feed Demo | Real-Time Content Ranking</title>
+        <title>{formatPageTitle("Feed")}</title>
       </Head>
       <DemoShell
         activePath="/feed"
-        eyebrow="Feed generation"
-        title="A feed surface that makes the ranking pipeline visible."
-        description="This page calls feed-service directly, exposes deterministic ranking signals, and sends real interaction events into the distributed system."
+        eyebrow="Personalized feed"
+        title="A feed surface with transparent ranking decisions."
+        description="This page shows how profile affinity, recency, engagement, trending behavior, and experimentation shape what a member sees next."
         users={users}
         selectedUserId={selectedUserId}
         selectedUser={selectedUser}
@@ -258,7 +259,7 @@ const FeedPage = () => {
 
             {usersError ? (
               <StateBlock
-                title="Demo users are unavailable"
+                title="User profiles are unavailable"
                 description={usersError}
                 tone="error"
               />
@@ -266,15 +267,15 @@ const FeedPage = () => {
 
             {!usersError && isUsersLoading ? (
               <StateBlock
-                title="Loading demo users"
-                description="Fetching the seeded user profiles used to drive the personalized feed."
+                title="Loading user profiles"
+                description="Fetching the reference profiles used to drive personalized ranking and retrieval."
               />
             ) : null}
 
             {!selectedUserId && !isUsersLoading ? (
               <StateBlock
-                title="Pick a demo user"
-                description="The feed cannot be generated until a seeded user profile is selected."
+                title="Choose a profile"
+                description="The feed cannot be generated until a profile is selected."
               />
             ) : null}
 
@@ -323,19 +324,20 @@ const FeedPage = () => {
 
           <div className="space-y-6">
             <SurfaceCard
-              title="Demo guide"
-              description="Suggested interactions when presenting the system."
+              title="What changes this feed"
+              description="The main levers that affect ordering, visibility, and downstream signals."
             >
               <div className="space-y-4 text-sm leading-7 text-[color:var(--ink-soft)]">
                 <p>
-                  1. Switch between seeded users to show how topic preferences reshape the feed.
+                  1. Switch profiles to compare how persisted interests reshape candidate retrieval.
                 </p>
                 <p>
-                  2. Open a card and inspect the weighted score contributions in the explanation
-                  drawer.
+                  2. Open a content card to inspect affinity, recency, engagement, trending, and
+                  diversity contributions in the explanation panel.
                 </p>
                 <p>
-                  3. Send like, save, skip, and click events to populate the live session stream.
+                  3. Use like, save, skip, and click actions to generate events that influence the
+                  broader ranking system.
                 </p>
               </div>
             </SurfaceCard>

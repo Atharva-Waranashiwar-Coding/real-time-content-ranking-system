@@ -112,4 +112,4 @@ Local monitoring assets live under `infra/docker/` and are documented in [observ
 
 - Docker Compose provisions infrastructure and monitoring, not the service processes.
 - Services run from source using `bash scripts/run_service.sh <service-name>`.
-- Demo state is intentionally bootstrapable and resettable with `bash scripts/setup_demo.sh`.
+- Reference data is intentionally bootstrapable and resettable with `bash scripts/setup_reference_data.sh`.

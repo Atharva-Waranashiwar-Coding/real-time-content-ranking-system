@@ -1,4 +1,4 @@
-"""Reset deterministic demo records in PostgreSQL and Redis."""
+"""Reset deterministic reference records in PostgreSQL and Redis."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ async def _scan_matching_keys(redis_client: redis.Redis, pattern: str) -> set[st
 
 
 async def reset_demo_state() -> None:
-    """Delete deterministic demo records from backing stores."""
+    """Delete deterministic reference records from backing stores."""
 
     print_step("RESET", "Connecting to PostgreSQL and Redis...")
     async_session, engine = await get_async_session()
@@ -115,7 +115,7 @@ async def reset_demo_state() -> None:
             content_id_list = sorted(content_ids)
             tag_id_list = sorted(tag_ids)
 
-            print_step("RESET", "Deleting demo rows from PostgreSQL...")
+            print_step("RESET", "Deleting reference rows from PostgreSQL...")
             await _delete_matching_rows(
                 session,
                 (
@@ -199,7 +199,7 @@ async def reset_demo_state() -> None:
             )
             await session.commit()
 
-        print_step("RESET", "Deleting demo keys from Redis...")
+        print_step("RESET", "Deleting reference keys from Redis...")
         redis_keys: set[str] = set()
         for user_id in canonical_user_ids:
             redis_keys.add(f"feature:user:{user_id}:topic-affinity:v1")
@@ -221,7 +221,7 @@ async def reset_demo_state() -> None:
         deleted_key_count = await _delete_redis_keys(redis_client, redis_keys)
         print_step("RESET", f"Removed {deleted_key_count} Redis keys")
     except Exception as exc:
-        print_error(f"Failed to reset demo state: {exc}")
+        print_error(f"Failed to reset reference state: {exc}")
         raise
     finally:
         await redis_client.aclose()
@@ -230,4 +230,4 @@ async def reset_demo_state() -> None:
 
 if __name__ == "__main__":
     asyncio.run(reset_demo_state())
-    print_success("Demo state reset completed")
+    print_success("Reference state reset completed")

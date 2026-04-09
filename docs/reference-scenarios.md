@@ -1,23 +1,23 @@
-# Demo Scenarios
+# Reference Scenarios
 
-This document defines the deterministic demo contract used by the seed scripts and the frontend walkthrough.
+This document defines the deterministic reference contract used by the seed scripts and the frontend walkthrough.
 
 ## Setup Contract
 
-Run this before a demo:
+Run this before a walkthrough:
 
 ```bash
 export DEMO_REFERENCE_TIME=2026-04-08T14:00:00+00:00
 export RANKING_FIXED_NOW=2026-04-08T14:00:00+00:00
-bash scripts/setup_demo.sh
+bash scripts/setup_reference_data.sh
 ```
 
 Why both values matter:
 
-- `DEMO_REFERENCE_TIME` anchors seeded content timestamps, feature snapshots, experiment exposures, and demo analytics rows.
+- `DEMO_REFERENCE_TIME` anchors seeded content timestamps, feature snapshots, experiment exposures, and reference analytics rows.
 - `RANKING_FIXED_NOW` freezes recency scoring so the score breakdown stays stable during the walkthrough.
 
-If you do not need a fully frozen clock, you can skip both exports and still use `bash scripts/setup_demo.sh`.
+If you do not need a fully frozen clock, you can skip both exports and still use `bash scripts/setup_reference_data.sh`.
 
 ## Canonical Users
 
@@ -69,17 +69,17 @@ If you do not need a fully frozen clock, you can skip both exports and still use
 
 ## What The Bootstrap Seeds
 
-`bash scripts/setup_demo.sh` creates a clean, deterministic baseline:
+`bash scripts/setup_reference_data.sh` creates a clean, deterministic baseline:
 
-- 5 canonical demo users with fixed UUIDs
+- 5 canonical reference users with fixed UUIDs
 - 50+ canonical content items with fixed UUIDs, tags, and draft/published mix
 - Redis content feature hashes and user topic affinity hashes
 - PostgreSQL feature snapshots for both content and user-topic features
-- deterministic experiment assignments for all demo users
+- deterministic experiment assignments for all reference users
 - deterministic experiment exposures and interaction outcomes so the analytics dashboard is not empty
 
-## Demo Safety Notes
+## Safety Notes
 
-- The reset script only targets demo records and feature keys derived from the canonical dataset.
-- Feed caches for demo users are cleared during reset so a fresh run starts from the same baseline.
-- The browser event stream widget is session-local; use the clear action in the UI if you want a clean live event panel mid-demo.
+- The reset script only targets reference records and feature keys derived from the canonical dataset.
+- Feed caches for seeded users are cleared during reset so a fresh run starts from the same baseline.
+- The browser event stream widget is session-local; use the clear action in the UI if you want a clean live event panel mid-walkthrough.

@@ -83,7 +83,7 @@ export function useDemoUsers() {
         }
       } catch (error) {
         if (!isCancelled) {
-          setError(error instanceof ApiError ? error.detail : "Unable to load demo users.");
+          setError(error instanceof ApiError ? error.detail : "Unable to load user profiles.");
         }
       } finally {
         if (!isCancelled) {

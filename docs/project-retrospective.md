@@ -40,7 +40,7 @@ Tradeoff:
 - shared packages create tighter repository coupling
 - local source execution needs bootstrap helpers because the package directories are intentionally repo-local
 
-### Direct frontend-to-service API calls for the demo
+### Direct frontend-to-service API calls for the portfolio walkthrough
 
 Chosen because:
 
@@ -68,7 +68,7 @@ Tradeoff:
 
 ### Product
 
-- add authentication and user sessions beyond the demo context
+- add authentication and user sessions beyond the current local walkthrough context
 - add creator metadata, richer content bodies, and moderation signals
 - expose historical interaction and ranking-decision views in the UI
 
@@ -81,7 +81,7 @@ Tradeoff:
 ## Lessons Learned
 
 - Explainability is easier to preserve if it is built into the DTOs from the beginning.
-- Deterministic demo data is worth real engineering time; it improves both demos and tests.
+- Deterministic reference data is worth real engineering time; it improves both walkthroughs and tests.
 - Experiment analytics are only credible when exposures and outcomes are modeled explicitly.
 - Shared schemas remove an entire class of integration drift, but local developer ergonomics need to be designed alongside them.
 - Observability should be part of the product story, especially in a systems-oriented portfolio project.
@@ -91,4 +91,4 @@ Tradeoff:
 1. Introduce authentication and a proper gateway or BFF for the frontend.
 2. Add a ranking feature service boundary and online/offline feature parity checks.
 3. Add a warehouse-oriented analytics path instead of relying only on service-owned OLTP tables.
-4. Replace the demo bootstrap with repeatable environment automation and fixture loading in CI.
+4. Replace the reference-data bootstrap with repeatable environment automation and fixture loading in CI.

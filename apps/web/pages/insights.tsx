@@ -7,6 +7,7 @@ import { StateBlock } from "../components/state-block";
 import { SurfaceCard } from "../components/surface-card";
 import { TopicAffinityChart } from "../components/topic-affinity-chart";
 import { TrendingChart } from "../components/trending-chart";
+import { formatPageTitle } from "../lib/branding";
 import { useDemoContext } from "../lib/demo-context";
 import { useDemoUsers, useFeedResponse, usePublishedContent } from "../lib/demo-hooks";
 import { formatPercent, formatScore, formatTopicLabel } from "../lib/format";
@@ -49,13 +50,13 @@ const InsightsPage = () => {
   return (
     <>
       <Head>
-        <title>Insights Demo | Real-Time Content Ranking</title>
+        <title>{formatPageTitle("Insights")}</title>
       </Head>
       <DemoShell
         activePath="/insights"
-        eyebrow="Ranking insights"
-        title="A profile and analytics view that explains why the system is behaving the way it is."
-        description="This page combines persisted user preferences, ranked feed outputs, published content catalog data, and the current browser session event stream."
+        eyebrow="Audience signals"
+        title="User interests, content momentum, and session behavior in one view."
+        description="This page combines persisted user preferences, ranked feed outputs, catalog composition, and current session activity so product and ranking teams can understand why the feed looks the way it does."
         users={users}
         selectedUserId={selectedUserId}
         selectedUser={selectedUser}

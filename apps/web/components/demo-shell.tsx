@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { fetchServiceHealth, serviceDefinitions } from "../lib/api";
+import { PRODUCT_NAME, PRODUCT_SUBTITLE } from "../lib/branding";
 import type { ServiceHealthState, UserResponse } from "../lib/contracts";
 import { formatRelativeTime } from "../lib/format";
 
@@ -32,14 +33,14 @@ function UserSwitcher({
   return (
     <label className="flex min-w-[220px] flex-col gap-2 text-sm text-[color:var(--ink-soft)]">
       <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--ink-soft)]/80">
-        Demo User
+        Viewing As
       </span>
       <select
         value={selectedUserId ?? ""}
         onChange={(event) => onSelectUser(event.target.value)}
         className="rounded-2xl border border-[color:var(--border-subtle)] bg-white/80 px-4 py-3 text-base text-[color:var(--ink-strong)] outline-none ring-0 transition focus:border-[color:var(--accent)]"
       >
-        {users.length === 0 ? <option value="">Loading users...</option> : null}
+        {users.length === 0 ? <option value="">Loading profiles...</option> : null}
         {users.map((user) => (
           <option key={user.id} value={user.id}>
             {user.username}
@@ -128,9 +129,9 @@ export function DemoShell({
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4 lg:px-10">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[color:var(--accent)]">
-              Real-Time Ranking Demo
+              {PRODUCT_NAME}
             </p>
-            <p className="mt-1 font-heading text-2xl">Tech Learning Feed</p>
+            <p className="mt-1 font-heading text-2xl">{PRODUCT_SUBTITLE}</p>
           </div>
           <nav className="flex flex-wrap items-center gap-2">
             {NAV_ITEMS.map((item) => {
@@ -190,7 +191,7 @@ export function DemoShell({
               </div>
             ) : (
               <p className="mt-6 text-sm text-[color:var(--ink-soft)]">
-                Select a user to load the personalized feed and derived insights.
+                Select a profile to load the personalized feed and live insights.
               </p>
             )}
           </aside>

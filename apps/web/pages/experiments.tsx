@@ -5,6 +5,7 @@ import { DemoShell } from "../components/demo-shell";
 import { MetricCard } from "../components/metric-card";
 import { StateBlock } from "../components/state-block";
 import { SurfaceCard } from "../components/surface-card";
+import { formatPageTitle } from "../lib/branding";
 import {
   useDemoUsers,
   useExperimentAssignment,
@@ -51,11 +52,11 @@ const ExperimentsPage = () => {
   return (
     <>
       <Head>
-        <title>Experiment Dashboard | Real-Time Content Ranking</title>
+        <title>{formatPageTitle("Ranking Strategy Dashboard")}</title>
       </Head>
       <DemoShell
         activePath="/experiments"
-        eyebrow="Experimentation"
+        eyebrow="Ranking optimization"
         title="A live comparison dashboard for ranking strategy outcomes."
         description="This surface shows deterministic user assignment, the active feed ranking experiment, and attributed CTR, save rate, and completion rate by strategy."
         users={users}
@@ -93,7 +94,7 @@ const ExperimentsPage = () => {
         <div className="mt-8 space-y-8">
           {usersError ? (
             <StateBlock
-              title="Demo users are unavailable"
+              title="User profiles are unavailable"
               description={usersError}
               tone="error"
             />
@@ -120,8 +121,8 @@ const ExperimentsPage = () => {
           !assignmentError &&
           !comparisonError ? (
             <StateBlock
-              title="Building the experiment dashboard"
-              description="Loading the selected user's deterministic assignment and the current comparison metrics from analytics-service."
+              title="Loading ranking strategy analytics"
+              description="Loading the selected profile's deterministic assignment and the current comparison metrics from analytics-service."
             />
           ) : null}
 

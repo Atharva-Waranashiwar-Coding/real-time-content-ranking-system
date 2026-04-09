@@ -28,7 +28,7 @@ This repository does not check in rendered screenshots by default, but these are
 ### 4. Operations Dashboard
 
 - Surface: Grafana `Ranking and Feed Operations`
-- State: recent demo traffic present after a few feed loads and interactions
+- State: recent local traffic present after a few feed loads and interactions
 - Why it matters: demonstrates operational maturity instead of only product UI polish
 
 ## Naming Suggestion

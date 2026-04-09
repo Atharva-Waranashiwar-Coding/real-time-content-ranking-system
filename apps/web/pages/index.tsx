@@ -6,6 +6,7 @@ import { FeedCard } from "../components/feed-card";
 import { MetricCard } from "../components/metric-card";
 import { StateBlock } from "../components/state-block";
 import { SurfaceCard } from "../components/surface-card";
+import { formatPageTitle } from "../lib/branding";
 import { TopicAffinityChart } from "../components/topic-affinity-chart";
 import { useDemoUsers, useFeedResponse } from "../lib/demo-hooks";
 import { formatCompactNumber, formatPercent, formatScore, formatTopicLabel } from "../lib/format";
@@ -36,13 +37,13 @@ const Home = () => {
   return (
     <>
       <Head>
-        <title>Real-Time Ranking Demo</title>
+        <title>{formatPageTitle("Overview")}</title>
       </Head>
       <DemoShell
         activePath="/"
-        eyebrow="System overview"
-        title="A product-grade window into the distributed ranking stack."
-        description="The frontend now exposes live feed generation, explainable scoring, user-interest shaping, and interaction ingestion in a form that is suitable for a LinkedIn-style demo."
+        eyebrow="Product overview"
+        title="A production-style learning feed, explained in real time."
+        description="Atlas Learning turns profile intent, interaction signals, and ranking strategy decisions into a personalized technical learning experience. This interface makes the effects visible instead of hiding them."
         users={users}
         selectedUserId={selectedUserId}
         selectedUser={selectedUser}
@@ -78,12 +79,12 @@ const Home = () => {
         <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="space-y-8">
             {usersError ? (
-              <StateBlock title="Unable to load demo users" description={usersError} tone="error" />
+              <StateBlock title="Unable to load user profiles" description={usersError} tone="error" />
             ) : null}
 
             {feedError ? (
               <StateBlock
-                title="Feed preview is unavailable"
+                title="Personalized feed is unavailable"
                 description={feedError}
                 tone="error"
               />
@@ -91,14 +92,14 @@ const Home = () => {
 
             {(isUsersLoading || isFeedLoading) && !usersError && !feedError ? (
               <StateBlock
-                title="Preparing the live demo"
-                description="Loading the selected demo user and a ranked feed preview from feed-service."
+                title="Loading the product workspace"
+                description="Loading the selected profile and a ranked feed preview from feed-service."
               />
             ) : null}
 
             <SurfaceCard
-              title="Why this demo feels real"
-              description="The UI is rendering the actual contracts produced by the backend services already in this repository."
+              title="What powers the feed"
+              description="The interface is rendering the same contracts the platform services exchange during real feed generation."
             >
               <div className="grid gap-4 md:grid-cols-3">
                 <StoryTile
@@ -138,8 +139,8 @@ const Home = () => {
             </SurfaceCard>
 
             <SurfaceCard
-              title="Top ranked preview"
-              description="The first few ranked items for the currently selected demo user."
+              title="Top-ranked content"
+              description="The first few ranked items for the currently selected profile."
             >
               <div className="space-y-5">
                 {(feed?.items ?? []).slice(0, 3).map((item) => (
@@ -161,6 +162,26 @@ const Home = () => {
               profileAffinity={selectedUser?.profile?.topic_preferences ?? {}}
               observedAffinity={observedAffinity}
             />
+
+            <SurfaceCard
+              title="What ranking changes"
+              description="The system is framed as a real product surface, so the feed impact is tied to business and user outcomes instead of only backend mechanics."
+            >
+              <div className="grid gap-4">
+                <StoryTile
+                  title="Discovery quality"
+                  description="Better candidate selection lifts the chance that a member sees relevant AI, backend, system design, or DevOps content early in the session."
+                />
+                <StoryTile
+                  title="Learning depth"
+                  description="Completion rate, saves, and repeat engagement indicate whether the ranking stack is surfacing content worth finishing and returning to."
+                />
+                <StoryTile
+                  title="Product trust"
+                  description="Explainable score factors and visible health signals help product, infra, and recruiting audiences understand what the system is doing and why."
+                />
+              </div>
+            </SurfaceCard>
 
             <SurfaceCard
               title="Preview snapshot"
