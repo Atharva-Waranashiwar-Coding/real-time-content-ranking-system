@@ -158,6 +158,13 @@ done
 bash scripts/run_migrations.sh
 ```
 
+If migrations fail with `DuplicateTable` because local tables already exist from an earlier run, reset the local PostgreSQL schema and rerun migrations:
+
+```bash
+python scripts/reset_local_database.py
+bash scripts/run_migrations.sh
+```
+
 ### 4. Load deterministic demo data
 
 ```bash

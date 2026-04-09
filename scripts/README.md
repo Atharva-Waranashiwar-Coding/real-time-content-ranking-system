@@ -62,6 +62,14 @@ bash scripts/run_migrations.sh
 This helper prefers the active virtualenv's `alembic` binary, then falls back to `.venv/bin/alembic` if present.
 If migrations fail with a missing `greenlet` error, install the updated requirements in the active virtualenv before retrying.
 
+### Reset local PostgreSQL schema
+
+```bash
+python scripts/reset_local_database.py
+```
+
+Use this when the local database already contains application tables but Alembic has not recorded its revision history yet. This resets the `public` schema for local development and should be followed by `bash scripts/run_migrations.sh`.
+
 ## Other Utilities
 
 - `format.sh`: repository formatting helper
