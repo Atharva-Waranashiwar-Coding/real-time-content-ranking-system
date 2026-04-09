@@ -22,6 +22,7 @@ logger = logging.getLogger("alembic.env")
 
 # Alembic runs synchronously, so use a sync PostgreSQL driver here.
 alembic_cfg.set_main_option("sqlalchemy.url", config.DATABASE_URL.replace("+asyncpg", "+psycopg2"))
+version_table = f"alembic_version_{config.SERVICE_NAME.replace('-', '_')}"
 
 # Add models for autogenerate support
 target_metadata = Base.metadata
@@ -30,7 +31,12 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
     url = alembic_cfg.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        version_table=version_table,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
@@ -45,7 +51,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            version_table=version_table,
+        )
 
         with context.begin_transaction():
             context.run_migrations()
