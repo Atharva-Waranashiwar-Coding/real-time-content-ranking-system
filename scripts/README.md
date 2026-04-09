@@ -4,6 +4,28 @@ This directory contains the local developer utilities used to run, reset, and de
 
 ## Most Important Commands
 
+### Start the full demo stack with one command
+
+```bash
+bash scripts/run_demo_stack.sh
+```
+
+This helper will:
+
+- start Docker infrastructure and monitoring
+- wait for PostgreSQL, Redis, and Kafka
+- run migrations
+- reseed the deterministic demo data
+- start every backend service from the project virtualenv
+- build and start the frontend on `http://localhost:3001`
+
+Related commands:
+
+```bash
+bash scripts/run_demo_stack.sh status
+bash scripts/run_demo_stack.sh down
+```
+
 ### Bootstrap a deterministic demo
 
 ```bash

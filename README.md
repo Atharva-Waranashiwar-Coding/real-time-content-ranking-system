@@ -82,7 +82,7 @@ Notes:
 
 - The frontend currently talks directly to service endpoints for the demo flow.
 - `api-gateway` exists in the repo, but it is not the primary path for the current web app.
-- Docker Compose provisions infrastructure and monitoring. Services are run from source for local development.
+- Docker Compose provisions infrastructure and monitoring. The repository now includes a one-command stack runner that starts infra, services, seeds, and the frontend together.
 
 ## Service Breakdown
 
@@ -107,6 +107,30 @@ Shared packages:
 - `packages/shared-logging`: structured logging, metrics, readiness helpers, HTTP observability
 
 ## Local Setup
+
+### One-command demo stack
+
+After the Python virtualenv and frontend dependencies are installed once, you can boot the full local system with:
+
+```bash
+bash scripts/run_demo_stack.sh
+```
+
+This single command will:
+
+- start Docker infrastructure and monitoring
+- wait for PostgreSQL, Redis, and Kafka
+- run all Alembic migrations
+- reseed the deterministic demo dataset
+- start every backend service
+- build and start the frontend on `http://localhost:3001`
+
+Useful follow-up commands:
+
+```bash
+bash scripts/run_demo_stack.sh status
+bash scripts/run_demo_stack.sh down
+```
 
 ### Prerequisites
 
@@ -139,6 +163,12 @@ for service in services/*; do
     pip install -r "$service/requirements.txt"
   fi
 done
+```
+
+Install the frontend dependencies once:
+
+```bash
+npm --prefix apps/web install
 ```
 
 If you already created `.venv` before the latest fixes, repair it with:
