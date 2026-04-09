@@ -36,6 +36,7 @@ def _load_local_package(module_name: str, relative_directory: str) -> None:
 _load_local_package("shared_schemas", "packages/shared-schemas")
 _load_local_package("shared_config", "packages/shared-config")
 _load_local_package("shared_logging", "packages/shared-logging")
+_load_local_package("shared_clients", "packages/shared-clients")
 
 sys.path.insert(0, str(PROJECT_ROOT / "services" / "user-service"))
 sys.path.insert(0, str(PROJECT_ROOT / "services" / "content-service"))
@@ -52,6 +53,15 @@ def get_database_url(service_name: str = "user") -> str:
     db_name = os.getenv("DB_NAME", "ranking_db")
 
     return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db_name}"
+
+
+def get_redis_url() -> str:
+    """Get the Redis URL from environment or config."""
+
+    host = os.getenv("REDIS_HOST", "localhost")
+    port = os.getenv("REDIS_PORT", "6379")
+    db = os.getenv("REDIS_DB", "0")
+    return f"redis://{host}:{port}/{db}"
 
 
 async def get_async_session(database_url: str = None):

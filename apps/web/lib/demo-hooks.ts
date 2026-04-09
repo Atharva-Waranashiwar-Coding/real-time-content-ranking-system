@@ -17,6 +17,29 @@ import type {
 } from "./contracts";
 import { useDemoContext } from "./demo-context";
 
+const DEMO_USER_ORDER: string[] = [
+  "alice_dev",
+  "bob_engineer",
+  "charlie_sysadmin",
+  "dana_ml",
+  "emma_fullstack",
+];
+
+function sortDemoUsers(users: UserResponse[]): UserResponse[] {
+  const positionByUsername = new Map(
+    DEMO_USER_ORDER.map((username, index) => [username, index]),
+  );
+
+  return [...users].sort((left, right) => {
+    const leftPosition = positionByUsername.get(left.username) ?? Number.MAX_SAFE_INTEGER;
+    const rightPosition = positionByUsername.get(right.username) ?? Number.MAX_SAFE_INTEGER;
+    if (leftPosition !== rightPosition) {
+      return leftPosition - rightPosition;
+    }
+    return left.username.localeCompare(right.username);
+  });
+}
+
 export function useDemoUsers() {
   const { isHydrated, selectedUserId, setSelectedUserId } = useDemoContext();
   const [users, setUsers] = useState<UserResponse[]>([]);
@@ -40,21 +63,22 @@ export function useDemoUsers() {
           return;
         }
 
-        setUsers(response);
+        const sortedUsers = sortDemoUsers(response);
+        setUsers(sortedUsers);
 
-        if (!selectedUserId && response.length > 0) {
+        if (!selectedUserId && sortedUsers.length > 0) {
           startTransition(() => {
-            setSelectedUserId(response[0].id);
+            setSelectedUserId(sortedUsers[0].id);
           });
         }
 
         if (
           selectedUserId &&
-          response.length > 0 &&
-          !response.some((user) => user.id === selectedUserId)
+          sortedUsers.length > 0 &&
+          !sortedUsers.some((user) => user.id === selectedUserId)
         ) {
           startTransition(() => {
-            setSelectedUserId(response[0].id);
+            setSelectedUserId(sortedUsers[0].id);
           });
         }
       } catch (error) {

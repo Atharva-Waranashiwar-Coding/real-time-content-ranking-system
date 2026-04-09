@@ -16,12 +16,12 @@ class ServiceConfig:
     DATABASE_URL = base_settings.database_url
     REDIS_URL = base_settings.redis_url
     KAFKA_BOOTSTRAP_SERVERS = base_settings.KAFKA_BOOTSTRAP_SERVERS
-    USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user-service:8001")
-    CONTENT_SERVICE_URL = os.getenv("CONTENT_SERVICE_URL", "http://content-service:8002")
-    RANKING_SERVICE_URL = os.getenv("RANKING_SERVICE_URL", "http://ranking-service:8005")
+    USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:8001")
+    CONTENT_SERVICE_URL = os.getenv("CONTENT_SERVICE_URL", "http://localhost:8002")
+    RANKING_SERVICE_URL = os.getenv("RANKING_SERVICE_URL", "http://localhost:8005")
     EXPERIMENTATION_SERVICE_URL = os.getenv(
         "EXPERIMENTATION_SERVICE_URL",
-        "http://experimentation-service:8006",
+        "http://localhost:8006",
     )
     REQUEST_ID_HEADER = "X-Request-ID"
     CORRELATION_ID_HEADER = "X-Correlation-ID"

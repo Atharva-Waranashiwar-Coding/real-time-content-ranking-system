@@ -33,6 +33,21 @@ def clamp_score(value: float, minimum: float = 0.0, maximum: float = 1.0) -> flo
     return max(minimum, min(maximum, value))
 
 
+def resolve_scoring_time(now: datetime | None = None) -> datetime:
+    """Resolve the timestamp used for recency scoring."""
+
+    if now is not None:
+        return now
+
+    if config.RANKING_FIXED_NOW:
+        fixed_now = datetime.fromisoformat(config.RANKING_FIXED_NOW.replace("Z", "+00:00"))
+        if fixed_now.tzinfo is None or fixed_now.tzinfo.utcoffset(fixed_now) is None:
+            return fixed_now.replace(tzinfo=timezone.utc)
+        return fixed_now.astimezone(timezone.utc)
+
+    return utc_now()
+
+
 def compute_recency_score(
     published_at: datetime | None,
     now: datetime | None = None,
@@ -42,7 +57,7 @@ def compute_recency_score(
     if published_at is None:
         return 0.0
 
-    current_time = now or utc_now()
+    current_time = resolve_scoring_time(now)
     age_hours = max((current_time - published_at).total_seconds() / 3600, 0.0)
     return round(
         clamp_score(
@@ -151,7 +166,7 @@ def rank_candidates(
 ) -> list[RankedContentItemV1Schema]:
     """Rank candidate items with a greedy diversity-aware ordering pass."""
 
-    scoring_time = now or utc_now()
+    scoring_time = resolve_scoring_time(now)
     strategy = get_strategy_definition(strategy_name)
     remaining_candidates: list[CandidateScoreState] = []
     for candidate in candidates:
@@ -217,4 +232,5 @@ __all__ = [
     "get_strategy_definition",
     "normalize_trending_score",
     "rank_candidates",
+    "resolve_scoring_time",
 ]

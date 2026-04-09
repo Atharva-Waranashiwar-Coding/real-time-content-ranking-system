@@ -38,6 +38,7 @@ class ServiceConfig:
     TRENDING_SCORE_SATURATION = float(
         os.getenv("TRENDING_SCORE_SATURATION", "25")
     )
+    RANKING_FIXED_NOW = os.getenv("RANKING_FIXED_NOW")
     V2_USER_TOPIC_AFFINITY_WEIGHT = float(
         os.getenv("V2_USER_TOPIC_AFFINITY_WEIGHT", "0.32")
     )
