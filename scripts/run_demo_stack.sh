@@ -124,6 +124,43 @@ port_listener_pid() {
   lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null | head -n 1 || true
 }
 
+pid_cwd() {
+  local process_id="$1"
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  lsof -a -p "${process_id}" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1 || true
+}
+
+is_repo_managed_listener() {
+  local process_id="$1"
+  local process_cwd
+
+  process_cwd="$(pid_cwd "${process_id}")"
+  [[ -n "${process_cwd}" && "${process_cwd}" == "${ROOT_DIR}"* ]]
+}
+
+stop_pid() {
+  local process_id="$1"
+  local label="$2"
+
+  if ! is_pid_running "${process_id}"; then
+    return
+  fi
+
+  log "Stopping stale ${label} process (${process_id})"
+  kill "${process_id}" >/dev/null 2>&1 || true
+  for _ in {1..20}; do
+    if ! is_pid_running "${process_id}"; then
+      return
+    fi
+    sleep 1
+  done
+
+  kill -9 "${process_id}" >/dev/null 2>&1 || true
+}
+
 ensure_port_is_available() {
   local process_name="$1"
   local port="$2"
@@ -137,6 +174,14 @@ ensure_port_is_available() {
   if [[ -n "${listener_pid}" ]]; then
     if [[ -n "${managed_pid}" && "${listener_pid}" == "${managed_pid}" ]]; then
       return
+    fi
+    if is_repo_managed_listener "${listener_pid}"; then
+      stop_pid "${listener_pid}" "${process_name}"
+      sleep 1
+      listener_pid="$(port_listener_pid "${port}")"
+      if [[ -z "${listener_pid}" ]]; then
+        return
+      fi
     fi
     fail "Port ${port} is already in use by another process (${listener_pid}). Stop it before starting ${process_name}."
   fi
