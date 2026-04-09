@@ -12,7 +12,7 @@ Bring up Prometheus and Grafana locally, run the application services on the hos
 docker compose -f infra/docker/docker-compose.yml up -d postgres redis zookeeper kafka prometheus grafana
 ```
 
-2. Start the application services on the host on ports `8000` through `8008`.
+2. Start the application services on the host on ports `8001` through `8008`.
 
 Prometheus is configured to scrape `host.docker.internal:<port>` so the services should run on the host network, not inside the same Docker Compose file.
 
@@ -57,7 +57,7 @@ Expected patterns:
 
 ## Recommended Demo Flow
 
-1. Load the web demo and request a few feeds.
+1. Load the web demo on `http://localhost:3001` and request a few feeds.
 2. Trigger `click`, `like`, `save`, and `skip` interactions.
 3. Watch `Event Pipeline` for publish/consume activity.
 4. Inspect `Ranking and Feed Operations` for ranking/feed latency movement.

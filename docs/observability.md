@@ -72,4 +72,4 @@ Provisioned dashboards in Grafana:
    - feed/ranking HTTP volume by route and status
    - dependency retry volume from feed-service
 
-Grafana provisioning files live under [infra/docker/grafana/provisioning](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/infra/docker/grafana/provisioning) and dashboard JSON files live under [infra/docker/grafana/dashboards](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/infra/docker/grafana/dashboards).
+Grafana provisioning files live under [infra/docker/grafana/provisioning](../infra/docker/grafana/provisioning) and dashboard JSON files live under [infra/docker/grafana/dashboards](../infra/docker/grafana/dashboards).

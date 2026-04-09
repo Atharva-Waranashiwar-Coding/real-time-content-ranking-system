@@ -1,265 +1,115 @@
 # Architecture Overview
 
-## System Design
+## System Shape
 
-The Real-Time Content Ranking System is a distributed, event-driven platform designed to ingest user interaction streams, compute feature signals in real time, and serve personalized content feeds with explainability and A/B experimentation support.
+The platform is a distributed content-ranking system with three major planes:
 
-## Core Architecture
+- request plane: feed generation, ranking, experimentation, and frontend interactions
+- event plane: interaction ingestion, Kafka fan-out, stream aggregation, and dead-letter handling
+- operational plane: metrics, structured logs, readiness/liveness, and local dashboards
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Frontend (Next.js)                           │
-│                    Feed | Analytics | Dashboards                     │
-└──────────────────────────────────┬──────────────────────────────────┘
-                                   │
-┌──────────────────────────────────▼──────────────────────────────────┐
-│                    API Gateway (FastAPI)                             │
-│              Routing | CORS | Authentication (future)               │
-└──────┬───────────┬──────────────┬──────────────┬────────────────────┘
-       │           │              │              │
-   ┌───▼────┐ ┌───▼────┐ ┌──────▼────┐ ┌──────▼────┐
-   │Content │ │ User   │ │Interaction│ │Feed/Ranking
-   │Service │ │Service │ │ Service   │ │ Services
-   └────┬────┘ └────┬───┘ └──────┬────┘ └──────┬────┘
-        └────────────┴────────────┴─────────────┘
-                     │
-        ┌────────────▼───────────────┐
-        │     Kafka (Event Bus)      │
-        │  interactions.events.v1    │
-        │  user.features.v1          │
-        │  content.features.v1       │
-        │  ranking.decisions.v1      │
-        └────────────┬───────────────┘
-                     │
-        ┌────────────▼──────────────────┐
-        │ Feature Processor (Stream)    │
-        │ Aggregations | Materialization│
-        └────────────┬──────────────────┘
-                     │
-        ┌────────────▼──────────────────┐
-        │  Redis | PostgreSQL           │
-        │  (Features | Audit | Metrics) │
-        └───────────────────────────────┘
+The current web app calls service endpoints directly. `api-gateway` remains in the repository as a reserved shell for future routing and platform concerns, but it is not the main UI path today.
 
-Observability:  Prometheus | Grafana | Structured Logs
-```
+## High-Level Flow
+
+1. The frontend requests a personalized feed from `feed-service`.
+2. `feed-service` retrieves recent, trending, and topic-aligned candidates using `content-service`, user context, Redis features, and deterministic experiment assignment.
+3. `ranking-service` scores the candidates and returns per-item explainability data.
+4. `feed-service` records an experiment exposure and returns the assembled page.
+5. Frontend actions such as `click`, `like`, `save`, `skip`, and watch events go to `interaction-service`.
+6. `interaction-service` persists the event for audit/replay and publishes `interactions.events.v1`.
+7. `feature-processor` consumes the topic, updates rolling aggregates, materializes Redis features, and persists snapshots to PostgreSQL.
+8. `analytics-service` attributes outcomes back to the most recent prior exposure for experiment reporting.
 
 ## Service Responsibilities
 
-### Backend Services
+| Service | Responsibility | Depends On |
+| --- | --- | --- |
+| `user-service` | user accounts, profiles, topic preferences | PostgreSQL |
+| `content-service` | content items, tags, draft/published state | PostgreSQL |
+| `interaction-service` | event validation, audit persistence, Kafka publication | PostgreSQL, Kafka |
+| `feature-processor` | rolling feature aggregation and DLQ handling | Kafka, Redis, PostgreSQL |
+| `ranking-service` | deterministic ranking and decision publication | Kafka |
+| `feed-service` | candidate retrieval, ranking orchestration, caching, exposure logging | Redis, `user-service`, `content-service`, `ranking-service`, `experimentation-service` |
+| `experimentation-service` | assignment and exposure persistence | PostgreSQL |
+| `analytics-service` | experiment comparison metrics | PostgreSQL |
+| `api-gateway` | reserved gateway shell | none |
 
-1. **API Gateway** (Port 8000)
-   - Entry point for all frontend requests
-   - Routes requests to appropriate domain services
-   - Handles CORS and request/response transformations
-   - Future: authentication, rate limiting
+## Data Boundaries
 
-2. **User Service** (Port 8001)
-   - User profile management
-   - Topic preferences and interests
-   - Account metadata and settings
-   - Provides user context for ranking
+### PostgreSQL
 
-3. **Content Service** (Port 8002)
-   - Content catalog management
-   - Metadata, categories, tags
-   - Publishing status and scheduling
-   - Content quality signals
+Owns durable records for:
 
-4. **Interaction Service** (Port 8003)
-   - Ingestion endpoint for user interactions
-   - Event validation and enrichment
-   - Kafka publishing for event streaming
-   - Audit trail persistence
+- users and user profiles
+- content items and tags
+- interaction audit events
+- experiment assignments and exposures
+- content feature snapshots
+- user-topic feature snapshots
 
-5. **Feed Service** (Port 8004)
-   - `GET /api/v1/feed` endpoint
-   - Candidate retrieval and pagination
-   - Works with Ranking Service for scoring
-   - Caching and performance optimization
+### Redis
 
-6. **Ranking Service** (Port 8005)
-   - Core ranking algorithm
-   - Rules-based scoring with explainability
-   - Score breakdown computation
-   - Strategy variants for experimentation
+Owns low-latency serving data for:
 
-7. **Experimentation Service** (Port 8006)
-   - User-to-strategy assignment
-   - Experiment exposure logging
-   - Metrics aggregation
-   - A/B test winner analysis
+- `feature:content:{content_id}:v1`
+- `feature:user:{user_id}:topic-affinity:v1`
+- feed page cache entries
 
-8. **Analytics Service** (Port 8007)
-   - Aggregated metrics and dashboards
-   - Trending content analysis
-   - User preference trends
-   - Feed performance metrics
+### Kafka
 
-9. **Feature Processor** (Port 8008)
-   - Stream consumer (Kafka)
-   - Real-time aggregation
-   - Feature materialization (Redis, PostgreSQL)
-   - Handles user and content embeddings
+Owns asynchronous system flow for:
 
-### Shared Packages
+- `interactions.events.v1`
+- `ranking.decisions.v1`
+- `interactions.events.dlq.v1`
 
-- **shared-schemas**: Pydantic models for events, DTOs, and validation
-- **shared-config**: Centralized configuration management
-- **shared-logging**: Structured logging setup and utilities
-- **shared-clients**: HTTP and Kafka client factories
+## Ranking Model
 
-## Data Flow
+The ranking boundary is intentionally simple and replaceable.
 
-### Interaction Pipeline
+Inputs:
 
-```
-User Action
-   ↓
-Frontend sends interaction event
-   ↓
-Interaction Service validates and enriches
-   ↓
-Events published to Kafka (interactions.events.v1)
-   ↓
-Feature Processor consumes and aggregates
-   ↓
-Features materialized to Redis and PostgreSQL
-   ↓
-Feed Service queries features for ranking
-   ↓
-Ranking Service computes scores
-   ↓
-Feed returned to frontend with explanations
-```
+- user topic affinity
+- recency
+- engagement rates
+- trending score
+- optional diversity penalty
 
-## Data Models
+Outputs:
 
-### Core Entities
+- ordered candidate list
+- numeric score
+- per-factor score breakdown
+- ranking decision event for downstream analysis
 
-- `users`: User accounts
-- `user_profiles`: Extended user metadata and preferences
-- `content_items`: Content catalog
-- `interactions`: User action audit log (immutable)
-- `user_topic_scores`: Real-time affinity signals
-- `content_feature_snapshots`: Periodic feature snapshots
-- `experiment_assignments`: User-to-strategy mappings
-- `ranking_decisions`: Ranking decision history
+This allows the current rules engine to be replaced later by a trained model without changing the feed contract.
 
-### Event Schemas
+## Experimentation Model
 
-All events flowing through Kafka use standardized schemas defined in `shared-schemas`.
+- assignment is deterministic from a hash of `experiment_key:user_id`
+- feed exposure rows are recorded when a page is actually delivered
+- analytics attribute `click`, `save`, and `watch_complete` to the most recent prior exposure for the same `user_id` and `content_id`
 
-**Interaction Event:**
-```json
-{
-  "event_id": "evt_001",
-  "event_type": "like | click | save | skip | watch_start | watch_complete",
-  "user_id": "usr_123",
-  "content_id": "cnt_456",
-  "session_id": "ses_789",
-  "topic": "system-design",
-  "watch_duration_seconds": 120,
-  "event_timestamp": "2026-04-07T19:30:00Z",
-  "metadata": {
-    "surface": "home_feed",
-    "device_type": "web"
-  }
-}
-```
+This is more credible than assignment-only reporting because it measures the strategy that actually served the item.
 
-## Infrastructure
+## Operational Model
 
-### Local Development (Docker Compose)
+Telemetry currently includes:
 
-- **PostgreSQL 15**: System of record (port 5432)
-- **Redis 7**: Cache and feature store (port 6379)
-- **Kafka + Zookeeper**: Event streaming (ports 9092, 2181)
-- **Prometheus**: Metrics collection (port 9090)
-- **Grafana**: Visualization (port 3000)
+- request count and latency by service
+- ranking latency by strategy
+- event publish and consume throughput
+- feed assembly latency split by cache hit
+- consumer lag where available
+- structured logs with request and correlation IDs
+- readiness and liveness endpoints
+- dead-letter handling for failed event processing
 
-### Network
+Local monitoring assets live under `infra/docker/` and are documented in [observability.md](observability.md).
 
-All services communicate over `ranking_network` bridge, enabling service discovery by hostname.
+## Local Development Notes
 
-## Observability
-
-### Metrics
-
-All services export Prometheus metrics at `/metrics` endpoint. Key metrics include:
-- Request count and latency
-- Event throughput
-- Feature computation time
-- Redis cache hit rates
-- Consumer lag for `feature-processor` when Kafka offset metadata is available
-- Ranking latency by strategy and feed assembly latency by cache path
-
-### Logging
-
-Structured JSON logging with correlation IDs enables distributed tracing.
-
-### Correlation Flow
-
-- Incoming HTTP requests generate or reuse `X-Request-ID` and `X-Correlation-ID`
-- Feed-service forwards those IDs into upstream HTTP dependencies
-- Interaction and ranking events preserve them in Kafka headers
-- Feature-processor and dead-letter publications log and emit the same identifiers for replay/debugging
-
-### Grafana Dashboards
-
-- Feed latency and throughput
-- Event ingestion rate
-- Feature freshness
-- Experiment performance comparison
-
-## Reliability & Resilience
-
-### Current Phase
-
-- Health checks on all services
-- Kafka auto-creates topics with replication
-- Redis persistence enabled
-
-### Current Operational Safeguards
-
-- HTTP and Kafka publish retries with bounded exponential backoff
-- Dead letter topic `interactions.events.dlq.v1` for invalid or repeatedly failing interaction processing
-- `/api/v1/live` and `/api/v1/ready` endpoints across services with dependency-aware readiness where practical
-
-### Future Phases
-
-- Circuit breakers for inter-service calls
-- Graceful degradation
-
-## Security (Future)
-
-- Authentication layer in API Gateway
-- Authorization per service
-- Encryption in transit (TLS)
-- Secret management for credentials
-
-## Technology Stack Summary
-
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js, React 18, TypeScript, Tailwind CSS |
-| API | FastAPI, SQLAlchemy, Pydantic |
-| Database | PostgreSQL, Redis |
-| Streaming | Apache Kafka, Zookeeper |
-| Monitoring | Prometheus, Grafana |
-| Infrastructure | Docker, Docker Compose |
-| Quality | pytest, black, ruff, GitHub Actions CI |
-
-## Deployment Strategy
-
-**Phase 0 (Current)**: Local Docker Compose development environment
-
-**Phase 7**: Production hardening and observability
-
-**Phase 8**: Optional: Cloud deployment (AWS/Azure/GCP)
-
-## References
-
-- See [repository-standards.md](repository-standards.md) for development standards
-- See ADRs in [docs/adr/](adr/) for architectural decisions
-- See [../README.md](../README.md) for quick start
+- Docker Compose provisions infrastructure and monitoring, not the service processes.
+- Services run from source using `bash scripts/run_service.sh <service-name>`.
+- Demo state is intentionally bootstrapable and resettable with `bash scripts/setup_demo.sh`.

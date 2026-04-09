@@ -62,7 +62,7 @@ real-time-content-ranking-system/
    - Easier to maintain consistency
 
 3. **Simplified Development Setup**
-   - Single `docker-compose up` starts entire system
+   - Single infrastructure compose file plus source-run service scripts start the local stack
    - One CI/CD pipeline configuration
    - Easier onboarding for new developers
 
@@ -136,7 +136,7 @@ Current approach supports:
 | Date | Event | Note |
 |------|-------|------|
 | 2026-04-07 | Initial decision | Chose monorepo for simplified development |
-| Phase 7+ | Revisit at scale | Evaluate polyrepo if team/complexity grows |
+| Future review | Revisit at scale | Evaluate polyrepo if team and service complexity outgrow the current workflow |
 
 ## References
 

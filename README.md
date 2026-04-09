@@ -1,282 +1,298 @@
 # Real-Time Content Ranking System
 
-A distributed event-driven content ranking platform that ingests user interaction streams in real-time, computes dynamic user and content features, and serves personalized feeds with explainable ranking, experimentation support, and production-grade observability.
+An event-driven platform that ingests user interactions, materializes ranking features in near real time, and serves an explainable personalized feed with experimentation and operational telemetry built in.
+
+This repository is structured like a serious backend portfolio project rather than a single demo app. It includes domain services, Kafka-based event flow, Redis feature materialization, deterministic ranking, experiment analytics, a polished frontend, and local observability assets.
 
 ## Project Overview
 
-This is a sophisticated, production-style system designed to:
+The system models a LinkedIn-style learning feed for technical content across AI, backend engineering, system design, DevOps, and interview preparation.
 
-- Ingest and process user interactions in real time via Kafka
-- Compute user topic affinity and content engagement features using streaming aggregation
-- Serve personalized feeds with deterministic ranking and explainability
-- Support A/B experimentation with multiple ranking strategies
-- Provide full observability with Prometheus metrics, Grafana dashboards, and structured logging
+What it demonstrates:
 
-### Target Domain
+- event-driven ingestion with Kafka and durable audit storage
+- low-latency ranking features in Redis backed by PostgreSQL snapshots
+- deterministic, explainable scoring with multiple ranking strategies
+- experiment assignment, exposure logging, and attributed outcome analytics
+- a demo frontend that makes the distributed system visible instead of hiding it
+- Prometheus, Grafana, structured logging, correlation IDs, and readiness/liveness checks
 
-**Tech Learning Feed** – a personalized content platform featuring system design posts, AI tutorials, backend engineering articles, DevOps explainers, and interview prep content.
+## Architecture Diagram
 
-## Architecture Overview
+```mermaid
+flowchart LR
+    Web[Next.js Demo Frontend]
+    Gateway[API Gateway<br/>health and routing shell]
 
+    UserSvc[User Service]
+    ContentSvc[Content Service]
+    InteractionSvc[Interaction Service]
+    FeedSvc[Feed Service]
+    RankingSvc[Ranking Service]
+    ExperimentSvc[Experimentation Service]
+    AnalyticsSvc[Analytics Service]
+    FeatureProcessor[Feature Processor]
+
+    Postgres[(PostgreSQL)]
+    Redis[(Redis)]
+    Kafka[(Kafka)]
+    Prometheus[Prometheus]
+    Grafana[Grafana]
+
+    Web --> UserSvc
+    Web --> ContentSvc
+    Web --> FeedSvc
+    Web --> InteractionSvc
+    Web --> ExperimentSvc
+    Web --> AnalyticsSvc
+    Web -. optional .-> Gateway
+
+    FeedSvc --> UserSvc
+    FeedSvc --> ContentSvc
+    FeedSvc --> RankingSvc
+    FeedSvc --> ExperimentSvc
+    FeedSvc --> Redis
+
+    InteractionSvc --> Postgres
+    InteractionSvc --> Kafka
+
+    RankingSvc --> Kafka
+
+    Kafka --> FeatureProcessor
+    FeatureProcessor --> Redis
+    FeatureProcessor --> Postgres
+
+    UserSvc --> Postgres
+    ContentSvc --> Postgres
+    ExperimentSvc --> Postgres
+    AnalyticsSvc --> Postgres
+
+    UserSvc --> Prometheus
+    ContentSvc --> Prometheus
+    InteractionSvc --> Prometheus
+    FeedSvc --> Prometheus
+    RankingSvc --> Prometheus
+    ExperimentSvc --> Prometheus
+    AnalyticsSvc --> Prometheus
+    FeatureProcessor --> Prometheus
+    Prometheus --> Grafana
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Frontend (Next.js/React)                     │
-│                    Feed UI | Analytics | Dashboards                 │
-└──────────────────────────────────┬──────────────────────────────────┘
-                                   │
-┌──────────────────────────────────▼──────────────────────────────────┐
-│                    API Gateway (FastAPI)                             │
-│                   Routing | Authentication                           │
-└──────┬───────────┬──────────────┬──────────────┬────────────────────┘
-       │           │              │              │
-   ┌───▼────┐ ┌───▼────┐ ┌──────▼────┐ ┌──────▼────┐
-   │ Content │ │ User   │ │Interaction│ │Feed/Ranking
-   │ Service │ │ Service│ │ Service   │ │ Services
-   └────┬────┘ └────┬───┘ └──────┬────┘ └──────┬────┘
-        └────────────┴────────────┴─────────────┘
-                     │
-        ┌────────────▼───────────────┐
-        │     Kafka (Event Bus)      │
-        │  interactions.events.v1    │
-        │  user.features.v1          │
-        │  content.features.v1       │
-        │  ranking.decisions.v1      │
-        └────────────┬───────────────┘
-                     │
-        ┌────────────▼──────────────────┐
-        │ Feature Processor (Stream)    │
-        │ Aggregations | Materialization│
-        └────────────┬──────────────────┘
-                     │
-        ┌────────────▼──────────────────┐
-        │  Redis | PostgreSQL           │
-        │  (Features | Audit | Metrics) │
-        └───────────────────────────────┘
 
-Observability:  Prometheus | Grafana | Structured Logs
-```
+Notes:
 
-## Core Services
+- The frontend currently talks directly to service endpoints for the demo flow.
+- `api-gateway` exists in the repo, but it is not the primary path for the current web app.
+- Docker Compose provisions infrastructure and monitoring. Services are run from source for local development.
 
-### Backend Services
+## Service Breakdown
 
-1. **API Gateway** – Entry point for frontend requests, routing to domain services
-2. **User Service** – User profiles, topic preferences, account metadata
-3. **Content Service** – Content metadata, categories, tags, publishing status
-4. **Interaction Service** – Ingestion of interaction events, validation, Kafka publishing
-5. **Feed Service** – Personalized feed endpoint, pagination, caching
-6. **Ranking Service** – Rules-based ranking logic with score breakdown and explainability
-7. **Feature Processor** – Stream processor consuming Kafka, computing features, materializing to Redis
-8. **Analytics Service** – Aggregated dashboards and trend metrics
-9. **Experimentation Service** – Experiment assignment, strategy variants, exposure logging
+| Service | Responsibility | Key API / Output | Primary Storage |
+| --- | --- | --- | --- |
+| `user-service` | User accounts and topic preferences | `/api/v1/users` | PostgreSQL |
+| `content-service` | Content metadata, tags, draft/published state | `/api/v1/content` | PostgreSQL |
+| `interaction-service` | Validates and persists interaction events, then publishes Kafka records | `/api/v1/interactions` | PostgreSQL, Kafka |
+| `feature-processor` | Consumes interaction events and computes low-latency feature vectors | `interactions.events.v1` consumer | Redis, PostgreSQL |
+| `ranking-service` | Scores candidates with deterministic rules-based strategies | `/api/v1/rankings`, `ranking.decisions.v1` | Kafka |
+| `feed-service` | Retrieves candidates, calls ranking, records exposures, caches pages | `/api/v1/feed` | Redis |
+| `experimentation-service` | Deterministic assignment and feed exposure persistence | `/api/v1/experiments/*` | PostgreSQL |
+| `analytics-service` | Attributed experiment comparison metrics | `/api/v1/experiments/{key}/comparison` | PostgreSQL |
+| `api-gateway` | Reserved entry shell for routing and platform concerns | health endpoints | none |
+| `apps/web` | Demo UI for feed, insights, and experiment analytics | `/`, `/feed`, `/insights`, `/experiments` | browser state |
 
-### Shared Packages
+Shared packages:
 
-- **shared-schemas** – Common Pydantic models for events, DTOs, and validation
-- **shared-config** – Centralized configuration and environment management
-- **shared-logging** – Structured logging setup and utilities
-- **shared-clients** – HTTP client factories and Kafka producer/consumer wrappers
+- `packages/shared-schemas`: versioned DTOs, event schemas, enums, and validation helpers
+- `packages/shared-config`: shared environment/config access
+- `packages/shared-clients`: HTTP and Kafka client abstractions
+- `packages/shared-logging`: structured logging, metrics, readiness helpers, HTTP observability
 
-### Infrastructure
-
-- **PostgreSQL** – System of record for users, content, interactions, and features
-- **Redis** – Low-latency feature lookup and feed caching
-- **Kafka** – Event streaming with Zookeeper for coordination
-- **Prometheus** – Metrics collection
-- **Grafana** – Metrics visualization and dashboards
-- **Runbooks** – Local monitoring and debugging workflows
-
-## Tech Stack
-
-### Backend
-- Python 3.10+
-- FastAPI
-- SQLAlchemy + Alembic
-- Pydantic
-- Confluent Kafka / aiokafka
-- Redis client
-
-### Frontend
-- Next.js / React 18+
-- TypeScript
-- Tailwind CSS
-- Recharts / ECharts
-
-### Data & Streaming
-- Apache Kafka
-- Zookeeper
-- Python streaming workers (upgrade path to Flink/Spark)
-
-### DevOps & Quality
-- Docker + Docker Compose
-- pytest
-- ruff + black
-- GitHub Actions CI
-- Prometheus + Grafana
-
-## Quick Start
+## Local Setup
 
 ### Prerequisites
 
-- Docker and Docker Compose 2.0+
-- Python 3.10+
-- Node.js 18+ (for frontend)
-- Git
+- Python 3.11
+- Node.js 18+
+- Docker with `docker compose`
 
-### Local Development
+### 1. Start infrastructure
 
-1. **Clone and setup**
-   ```bash
-   git clone https://github.com/Atharva-Waranashiwar-Coding/real-time-content-ranking-system.git
-   cd real-time-content-ranking-system
-   ```
-
-2. **Start the full stack**
-   ```bash
-   docker-compose -f infra/docker/docker-compose.yml up -d
-   ```
-
-   This spins up:
-   - PostgreSQL (port 5432)
-   - Redis (port 6379)
-   - Kafka + Zookeeper (port 9092, 2181)
-   - Prometheus (port 9090)
-   - Grafana (port 3000)
-
-3. **Install backend dependencies**
-   ```bash
-   cd services/api-gateway
-   python -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   python app/main.py
-   ```
-
-4. **Install frontend dependencies**
-   ```bash
-   cd apps/web
-   npm install
-   npm run dev
-   ```
-
-5. **Access the system**
-   - Frontend: http://localhost:3000
-   - API Gateway: http://localhost:8000/health
-   - Grafana: http://localhost:3000 (admin/admin)
-   - Prometheus: http://localhost:9090
-
-## Repository Structure
-
-```
-real-time-content-ranking-system/
-├── apps/
-│   └── web/                          # Next.js/React frontend
-├── services/
-│   ├── api-gateway/                  # FastAPI gateway
-│   ├── user-service/                 # User domain service
-│   ├── content-service/              # Content domain service
-│   ├── interaction-service/          # Interaction ingestion
-│   ├── feed-service/                 # Personalized feed endpoint
-│   ├── ranking-service/              # Ranking engine
-│   ├── experimentation-service/      # A/B experiment framework
-│   ├── analytics-service/            # Analytics and metrics
-│   └── feature-processor/            # Kafka stream processor
-├── packages/
-│   ├── shared-schemas/               # Common Pydantic models
-│   ├── shared-config/                # Configuration utilities
-│   ├── shared-logging/               # Logging and observability helpers
-│   └── shared-clients/               # HTTP/Kafka clients
-├── infra/
-│   └── docker/                       # Docker Compose, Prometheus, Grafana, dashboards
-├── docs/
-│   ├── architecture-overview.md      # System design
-│   ├── observability.md              # Telemetry and dashboard inventory
-│   ├── repository-standards.md       # Code standards
-│   ├── runbooks/                     # Local monitoring and debugging workflows
-│   └── adr/                          # Architecture decision records
-├── scripts/
-│   ├── lint.sh                       # Linting automation
-│   └── format.sh                     # Code formatting
-├── .github/
-│   └── workflows/                    # CI/CD pipelines
-└── .editorconfig, .gitignore, pyproject.toml, package.json
-```
-
-## Naming Conventions
-
-- **Branches:** `phase/<number>-<short-name>` (e.g., `phase/00-foundation-setup`)
-- **Commits:** Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `build:`)
-- **API paths:** `/api/v1/...` for versioned endpoints
-- **Kafka topics:** lowercase with dots (e.g., `interactions.events.v1`)
-- **Database tables:** snake_case pluralized (e.g., `user_profiles`, `content_items`)
-- **Environment variables:** UPPER_SNAKE_CASE
-
-## Development Workflow
-
-### Code Quality
-
-1. **Format code**
-   ```bash
-   bash scripts/format.sh
-   ```
-
-2. **Lint code**
-   ```bash
-   bash scripts/lint.sh
-   ```
-
-3. **Run tests**
-   ```bash
-   pytest tests/
-   ```
-
-### Pre-commit Hooks
-
-Pre-commit hooks validate code before commit:
 ```bash
-pre-commit install
+cp .env.example .env
+cp apps/web/.env.example apps/web/.env.local
+docker compose -f infra/docker/docker-compose.yml up -d
 ```
 
-Hooks include black, ruff, end-of-file-fixer, and trailing-whitespace.
+This starts PostgreSQL, Redis, Kafka, Zookeeper, Prometheus, and Grafana.
 
-## Phase-Based Implementation
+### 2. Create a Python environment and install dependencies
 
-- **Phase 0:** Foundation and monorepo setup (current)
-- **Phase 1:** Core domain services (User, Content)
-- **Phase 2:** Interaction ingestion and Kafka integration
-- **Phase 3:** Feature aggregation pipeline
-- **Phase 4:** Ranking engine and feed service
-- **Phase 5:** Frontend UI and dashboards
-- **Phase 6:** A/B experimentation framework
-- **Phase 7:** Observability and hardening
-- **Phase 8:** Demo readiness and polish
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -r scripts/requirements.txt
+for service in services/*; do
+  if [ -f "$service/requirements.txt" ]; then
+    pip install -r "$service/requirements.txt"
+  fi
+done
+```
 
-See [real_time_content_ranking_system_plan.md](real_time_content_ranking_system_plan.md) for detailed phase specifications.
-See [docs/observability.md](docs/observability.md) for telemetry and dashboard details.
-See [docs/runbooks/local-monitoring.md](docs/runbooks/local-monitoring.md) and [docs/runbooks/debugging.md](docs/runbooks/debugging.md) for local operations.
+### 3. Run database migrations
 
-## Key Concepts
+```bash
+(
+  cd services/user-service &&
+  PYTHONPATH=../.. alembic upgrade head
+)
+(
+  cd services/content-service &&
+  PYTHONPATH=../.. alembic upgrade head
+)
+(
+  cd services/interaction-service &&
+  PYTHONPATH=../.. alembic upgrade head
+)
+(
+  cd services/experimentation-service &&
+  PYTHONPATH=../.. alembic upgrade head
+)
+(
+  cd services/feature-processor &&
+  PYTHONPATH=../.. alembic upgrade head
+)
+```
 
-### Event-Driven Architecture
-User interactions flow through Kafka topics, enabling decoupled, scalable processing of events across services.
+### 4. Load deterministic demo data
 
-### Real-Time Features
-Feature Processor consumes interaction events and materializes aggregated signals to Redis for low-latency ranking queries.
+```bash
+bash scripts/setup_demo.sh
+```
 
-### Personalized Ranking
-Ranking Service computes scores based on user topic affinity, content trending, recency, and engagement with explainability payloads.
+Optional for a fully frozen demo:
 
-### Experimentation
-Experimentation Service assigns users to ranking strategies and logs exposures for comparative analysis and winner determination.
+```bash
+export DEMO_REFERENCE_TIME=2026-04-08T14:00:00+00:00
+export RANKING_FIXED_NOW=2026-04-08T14:00:00+00:00
+bash scripts/setup_demo.sh
+```
 
-## Contributing
+### 5. Start backend services from source
 
-Follow repository standards defined in [docs/repository-standards.md](docs/repository-standards.md).
+Open one terminal per service:
+
+```bash
+bash scripts/run_service.sh user-service
+bash scripts/run_service.sh content-service
+bash scripts/run_service.sh interaction-service
+bash scripts/run_service.sh ranking-service
+bash scripts/run_service.sh feed-service
+bash scripts/run_service.sh experimentation-service
+bash scripts/run_service.sh analytics-service
+```
+
+Optional live streaming processor:
+
+```bash
+bash scripts/run_service.sh feature-processor
+```
+
+### 6. Start the frontend
+
+```bash
+cd apps/web
+npm install
+npm run dev -- --port 3001
+```
+
+### Local URLs
+
+- Frontend: `http://localhost:3001`
+- User service: `http://localhost:8001/api/v1/health`
+- Content service: `http://localhost:8002/api/v1/health`
+- Interaction service: `http://localhost:8003/api/v1/health`
+- Feed service: `http://localhost:8004/api/v1/health`
+- Ranking service: `http://localhost:8005/api/v1/health`
+- Experimentation service: `http://localhost:8006/api/v1/health`
+- Analytics service: `http://localhost:8007/api/v1/health`
+- Feature processor: `http://localhost:8008/api/v1/health`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` with `admin / admin`
+
+## Demo Flow
+
+The cleanest walkthrough for a recruiter, hiring manager, or interviewer:
+
+1. Open `/` and explain the platform at a high level.
+2. Move to `/feed` and pick `alice_dev` for the baseline personalized feed story.
+3. Open the score breakdown drawer for a top item and explain affinity, recency, engagement, trending, and diversity penalty contributions.
+4. Trigger `like`, `save`, `skip`, and `click` actions to show real event ingestion.
+5. Move to `/insights` to connect the user profile, trending content, and session event stream.
+6. Move to `/experiments` to show deterministic assignment and attributed strategy metrics.
+7. Open Grafana to show request throughput, ranking latency, and event pipeline health.
+
+For a deterministic set of user stories, use the scenarios in [docs/demo-scenarios.md](docs/demo-scenarios.md).
+
+## Screenshots
+
+The repository includes a capture plan for portfolio screenshots in [docs/screenshots/README.md](docs/screenshots/README.md).
+
+Suggested final screenshots:
+
+- feed page with score breakdown drawer open
+- insights page with topic profile and trending charts
+- experiment dashboard with strategy comparison bars
+- Grafana dashboard showing feed and event pipeline metrics
+
+## Repository Layout
+
+```text
+apps/
+  web/                      Frontend demo application
+services/
+  api-gateway/              Reserved gateway shell
+  user-service/             User and profile domain service
+  content-service/          Content metadata service
+  interaction-service/      Event ingestion entry point
+  feed-service/             Candidate retrieval and feed assembly
+  ranking-service/          Deterministic scoring and decision events
+  experimentation-service/  Assignment and exposure persistence
+  analytics-service/        Experiment outcome aggregation
+  feature-processor/        Kafka consumer and feature materializer
+packages/
+  shared-schemas/           Versioned DTOs and event schemas
+  shared-config/            Shared configuration helpers
+  shared-clients/           HTTP and Kafka clients
+  shared-logging/           Logging, metrics, and health helpers
+infra/
+  docker/                   Compose, Prometheus, Grafana, DB init
+docs/
+  architecture, API, runbooks, demo notes, interview notes
+scripts/
+  demo reset/bootstrap helpers, formatting, linting, service runner
+```
+
+## Why This Project Matters
+
+This repo is intentionally opinionated:
+
+- it isolates ranking logic so it can be replaced later by ML models
+- it keeps schemas explicit and versioned instead of passing ad hoc JSON
+- it treats observability as part of the product, not an afterthought
+- it makes experiment attribution and explainability visible in the UI
+- it is realistic enough to discuss tradeoffs, scaling paths, and operational concerns in an interview
+
+## Additional Documentation
+
+- [Architecture overview](docs/architecture-overview.md)
+- [API reference index](docs/api/README.md)
+- [Observability guide](docs/observability.md)
+- [Demo scenarios](docs/demo-scenarios.md)
+- [Interview guide](docs/interview-guide.md)
+- [Tradeoffs and lessons learned](docs/project-retrospective.md)
+- [Local monitoring runbook](docs/runbooks/local-monitoring.md)
+- [Debugging runbook](docs/runbooks/debugging.md)
 
 ## License
 
-MIT License. See LICENSE file for details.
-
-## Contact
-
-For questions or feedback, reach out to [Atharva Waranashiwar](https://linkedin.com/in/atharva-waranashiwar).
+MIT. See [LICENSE](LICENSE).

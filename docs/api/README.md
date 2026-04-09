@@ -1,4 +1,4 @@
-# Core Domain APIs
+# Service API Reference
 
 This directory documents the domain APIs implemented by the backend services currently wired in the monorepo.
 
@@ -13,11 +13,11 @@ This directory documents the domain APIs implemented by the backend services cur
 
 ## Service Docs
 
-- [user-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/user-service.md)
-- [content-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/content-service.md)
-- [interaction-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/interaction-service.md)
-- [ranking-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/ranking-service.md)
-- [feed-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/feed-service.md)
-- [feature-processor.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/feature-processor.md)
-- [experimentation-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/experimentation-service.md)
-- [analytics-service.md](/Users/atharvawaranashiwar/Documents/Projects/content_ranking_system/docs/api/analytics-service.md)
+- [user-service.md](user-service.md)
+- [content-service.md](content-service.md)
+- [interaction-service.md](interaction-service.md)
+- [ranking-service.md](ranking-service.md)
+- [feed-service.md](feed-service.md)
+- [feature-processor.md](feature-processor.md)
+- [experimentation-service.md](experimentation-service.md)
+- [analytics-service.md](analytics-service.md)
